@@ -166,7 +166,7 @@ async def pm_agent(state: ProjectState) -> dict:
 
         # Use Proposer-Critic if enabled
         if discussion_config.get("enabled", False):
-            raw_response, discussion = proposer_critic_discuss(
+            raw_response, discussion = await proposer_critic_discuss(
                 task=task,
                 proposer_prompt=PM_SYSTEM_PROMPT,
                 critic_prompt=PM_CRITIC_PROMPT,

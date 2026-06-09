@@ -130,7 +130,7 @@ async def architect_agent(state: dict) -> dict[str, Any]:
 
         # Use Proposer-Critic if enabled
         if discussion_config.get("enabled", False):
-            raw_response, discussion = proposer_critic_discuss(
+            raw_response, discussion = await proposer_critic_discuss(
                 task=task,
                 proposer_prompt=ARCHITECT_SYSTEM_PROMPT,
                 critic_prompt=ARCHITECT_CRITIC_PROMPT,

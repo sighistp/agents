@@ -8,7 +8,8 @@ from typing import Any
 
 from devteam.agents.tools import REVIEWER_TOOLS, serialize_call, get_call_name, get_call_args
 from devteam.agents.tool_executor import execute_tool
-from devteam.utils.llm import call_llm_with_tools
+import asyncio
+from devteam.utils.llm import call_llm_with_tools_async
 from devteam.utils.logger import get_logger
 
 logger = get_logger("reviewer")
@@ -42,7 +43,7 @@ REVIEWER_SYSTEM_PROMPT = """你是代码审查专家。你的任务是对项目�
 
 # ── Agent Node ──────────────────────────────────────────────────────────────
 
-def reviewer_agent(state: dict) -> dict[str, Any]:
+async def reviewer_agent(state: dict) -> dict[str, Any]:
     """Reviewer agent: tool-loop based code review.
 
     Args:
@@ -71,7 +72,7 @@ def reviewer_agent(state: dict) -> dict[str, Any]:
     error = None
 
     for step in range(MAX_STEPS):
-        response = call_llm_with_tools(llm_messages, REVIEWER_TOOLS)
+        response = await call_llm_with_tools_async(llm_messages, REVIEWER_TOOLS)
 
         # No tool calls → implicit done
         if not response.tool_calls:
@@ -93,7 +94,7 @@ def reviewer_agent(state: dict) -> dict[str, Any]:
             tool_name = get_call_name(tc)
             args = get_call_args(tc)
             tc_id = tc.get("id", "") if isinstance(tc, dict) else tc.id
-            result = execute_tool(tc, project_dir)
+            result = await asyncio.to_thread(execute_tool, tc, project_dir)
             llm_messages.append({
                 "role": "tool",
                 "tool_call_id": tc_id,

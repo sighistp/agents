@@ -154,3 +154,11 @@ def call_llm_with_tools(messages: list, tools: list):
     with _llm_semaphore:
         llm_with_tools = llm.bind_tools(tools)
         return llm_with_tools.invoke(messages)
+
+
+async def call_llm_with_tools_async(messages: list, tools: list):
+    """异步版本：调用 LLM 并绑定工具，返回完整 response（含 tool_calls）"""
+    llm = _get_llm()
+    async with _async_llm_lock:
+        llm_with_tools = llm.bind_tools(tools)
+        return await llm_with_tools.ainvoke(messages)

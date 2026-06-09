@@ -8,7 +8,8 @@ from typing import Any
 
 from devteam.agents.tools import TESTER_TOOLS, serialize_call, get_call_name, get_call_args
 from devteam.agents.tool_executor import execute_tool
-from devteam.utils.llm import call_llm_with_tools
+import asyncio
+from devteam.utils.llm import call_llm_with_tools_async
 from devteam.utils.logger import get_logger
 
 logger = get_logger("tester")
@@ -77,7 +78,7 @@ def _extract_test_passed(summary: str, had_execution_errors: bool) -> bool:
 
 # ── Agent Node ──────────────────────────────────────────────────────────────
 
-def tester_agent(state: dict) -> dict[str, Any]:
+async def tester_agent(state: dict) -> dict[str, Any]:
     """Tester agent: tool-loop based testing.
 
     Iterates up to MAX_STEPS, calling LLM with tools and executing them.
@@ -98,7 +99,7 @@ def tester_agent(state: dict) -> dict[str, Any]:
 
         for step in range(MAX_STEPS):
             # Call LLM with tools
-            response = call_llm_with_tools(llm_messages, TESTER_TOOLS)
+            response = await call_llm_with_tools_async(llm_messages, TESTER_TOOLS)
 
             # Record assistant message
             assistant_msg = {"role": "assistant", "content": response.content or ""}
@@ -119,7 +120,7 @@ def tester_agent(state: dict) -> dict[str, Any]:
                 tc_id = tc.get("id", "") if isinstance(tc, dict) else tc.id
 
                 # Execute the tool
-                result_str = execute_tool(tc, project_dir)
+                result_str = await asyncio.to_thread(execute_tool, tc, project_dir)
 
                 # Track execute_python failures
                 if tool_name == "execute_python":

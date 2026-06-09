@@ -9,7 +9,8 @@ from typing import Any
 
 from devteam.agents.tools import DEVELOPER_TOOLS, serialize_call, get_call_name, get_call_args
 from devteam.agents import tool_executor
-from devteam.utils.llm import call_llm_with_tools
+import asyncio
+from devteam.utils.llm import call_llm_with_tools_async
 from devteam.utils.logger import get_logger
 
 logger = get_logger("developer")
@@ -68,7 +69,7 @@ def build_developer_prompt(state: dict) -> list[dict]:
 
 # ── Agent Node ──────────────────────────────────────────────────────────────
 
-def developer_agent(state: dict) -> dict[str, Any]:
+async def developer_agent(state: dict) -> dict[str, Any]:
     """Developer agent: tool-loop pattern.
 
     Each iteration calls LLM with tools, executes the returned tool_calls,
@@ -83,7 +84,7 @@ def developer_agent(state: dict) -> dict[str, Any]:
     try:
         for step in range(MAX_STEPS):
             # 1. Call LLM with tools
-            response = call_llm_with_tools(messages, DEVELOPER_TOOLS)
+            response = await call_llm_with_tools_async(messages, DEVELOPER_TOOLS)
 
             # Build assistant message with tool_calls in OpenAI format
             assistant_msg: dict[str, Any] = {"role": "assistant", "content": response.content or ""}
@@ -100,7 +101,7 @@ def developer_agent(state: dict) -> dict[str, Any]:
             for tc in response.tool_calls:
                 tool_name = get_call_name(tc)
                 tc_id = tc.get("id", "") if isinstance(tc, dict) else tc.id
-                result_str = tool_executor.execute_tool(tc, project_dir)
+                result_str = await asyncio.to_thread(tool_executor.execute_tool, tc, project_dir)
 
                 # Track file_write calls
                 if tool_name == "file_write":
