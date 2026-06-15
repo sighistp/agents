@@ -148,6 +148,22 @@
       </div>
     </template>
 
+    <!-- New Analysis Tabs -->
+    <template v-if="state">
+      <div class="tab-bar">
+        <button class="tab-btn" :class="{ active: activeTab === 'quality' }" @click="activeTab = activeTab === 'quality' ? '' : 'quality'">质量评分</button>
+        <button class="tab-btn" :class="{ active: activeTab === 'security' }" @click="activeTab = activeTab === 'security' ? '' : 'security'">安全扫描</button>
+        <button class="tab-btn" :class="{ active: activeTab === 'diff' }" @click="activeTab = activeTab === 'diff' ? '' : 'diff'">变更对比</button>
+        <button class="tab-btn" :class="{ active: activeTab === 'traces' }" @click="activeTab = activeTab === 'traces' ? '' : 'traces'">Agent追踪</button>
+      </div>
+      <div class="tab-panel" v-if="activeTab">
+        <QualityScore v-if="activeTab === 'quality'" :projectId="projectId" />
+        <SecurityReport v-if="activeTab === 'security'" :projectId="projectId" />
+        <DiffViewer v-if="activeTab === 'diff'" :projectId="projectId" />
+        <AgentTracePanel v-if="activeTab === 'traces'" :projectId="projectId" />
+      </div>
+    </template>
+
     <!-- Edit Dialog -->
     <div v-if="editDialogVisible" class="dialog-overlay" @click.self="editDialogVisible = false">
       <div class="dialog">
@@ -181,6 +197,10 @@ import { saveAs } from 'file-saver'
 import { api } from '../api/index.js'
 import { useProjectStore } from '../stores/project.js'
 import { useFilePreview } from '../composables/useFilePreview.js'
+import QualityScore from '../components/QualityScore.vue'
+import SecurityReport from '../components/SecurityReport.vue'
+import DiffViewer from '../components/DiffViewer.vue'
+import AgentTracePanel from '../components/AgentTracePanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -212,6 +232,9 @@ const executions = ref([])
 const editDialogVisible = ref(false)
 const editText = ref('')
 const rerunDialogVisible = ref(false)
+
+// Tabs for new panels
+const activeTab = ref('')
 
 // Computed
 const displayName = computed(() => {
@@ -707,6 +730,13 @@ onMounted(() => {
   padding: 16px 0;
   text-align: center;
 }
+
+/* Tabs */
+.tab-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab-btn { font-size: 13px; padding: 8px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; cursor: pointer; transition: all 0.15s; }
+.tab-btn:hover { border-color: var(--primary); color: var(--primary); }
+.tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.tab-panel { background: var(--bg-panel, var(--bg)); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
 
 /* Dialog */
 .dialog-overlay {

@@ -36,4 +36,14 @@ export const api = {
   getProjectConversations: (id) => request(`/projects/${id}/conversations`),
   getProjectExecutions: (id) => request(`/projects/${id}/executions`),
   exportProject: (id) => `/api/projects/${id}/export`,
+  getQualityScore: (id) => request(`/projects/${id}/quality`),
+  getSecurityReport: (id) => request(`/projects/${id}/security`),
+  getDiff: (id, a, b) => request(`/projects/${id}/diff?a=${a}&b=${b}`),
+  getSnapshots: (id) => request(`/projects/${id}/snapshots`),
+  getTraces: (id, agent, iteration) => {
+    const params = new URLSearchParams()
+    if (agent) params.set('agent', agent)
+    if (iteration != null) params.set('iteration', iteration)
+    return request(`/projects/${id}/traces?${params}`)
+  },
 }
