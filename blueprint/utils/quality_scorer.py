@@ -93,12 +93,18 @@ class QualityScorer:
         return max_depth
 
     def _score_test_coverage(self, files: list[Path]) -> float:
+        """Estimate test coverage based on file count ratio.
+
+        Note: This is a rough heuristic — file-count ratio, not actual code coverage.
+        A project with 1 test file and 1 source file scores ~50%, not 100%.
+        """
         source_files = [f for f in files if not f.name.startswith("test_") and f.suffix == ".py"]
         test_files = [f for f in files if f.name.startswith("test_") and f.suffix == ".py"]
         if not source_files:
             return 50.0
         ratio = len(test_files) / len(source_files)
-        return min(100, ratio * 100)
+        # Cap at 80% since file-count ratio is not real coverage
+        return min(80, ratio * 80)
 
     def _score_security(self, files: list[Path]) -> float:
         violations = 0

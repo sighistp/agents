@@ -55,7 +55,6 @@ class DeployGenerator:
     def _compose(self, tech: str) -> str:
         port = "8000" if tech == "python" else "3000" if tech == "node" else "80"
         return (
-            f"version: '3.8'\n"
             f"services:\n"
             f"  app:\n"
             f"    build: .\n"

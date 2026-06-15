@@ -8,7 +8,7 @@ class DocGenerator:
         """Generate documentation files for a project."""
         project_path = Path(project_dir)
         files = self._scan_files(project_path)
-        tech_stack = self._detect_tech_stack(project_path)
+        tech_stack = self._detect_tech_stack(files)
 
         return {
             "readme": self._generate_readme(requirement, tech_stack, files),
@@ -24,16 +24,16 @@ class DocGenerator:
                 files.append(f)
         return files
 
-    def _detect_tech_stack(self, project_path: Path) -> list[str]:
+    def _detect_tech_stack(self, files: list[Path]) -> list[str]:
         stack = []
-        files = [f.name for f in self._scan_files(project_path)]
-        if any(f.endswith('.py') for f in files):
+        names = [f.name for f in files]
+        if any(f.endswith('.py') for f in names):
             stack.append("python")
-        if 'package.json' in files:
+        if 'package.json' in names:
             stack.append("node")
-        if any(f.endswith('.html') for f in files):
+        if any(f.endswith('.html') for f in names):
             stack.append("html")
-        if any(f.endswith(('.js', '.ts')) for f in files):
+        if any(f.endswith(('.js', '.ts')) for f in names):
             stack.append("javascript")
         return stack if stack else ["unknown"]
 

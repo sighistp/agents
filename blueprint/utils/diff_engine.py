@@ -31,8 +31,6 @@ class DiffEngine:
         if len(data) > 10240:
             with gzip.open(str(snap_file) + ".gz", "wb") as f:
                 f.write(data)
-            if snap_file.exists():
-                snap_file.unlink()
         else:
             snap_file.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
 

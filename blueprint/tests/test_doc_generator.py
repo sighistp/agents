@@ -28,10 +28,12 @@ def test_detect_tech_stack():
     gen = DocGenerator()
     with tempfile.TemporaryDirectory() as tmpdir:
         (Path(tmpdir) / "app.py").write_text("x = 1")
-        stack = gen._detect_tech_stack(Path(tmpdir))
+        files = gen._scan_files(Path(tmpdir))
+        stack = gen._detect_tech_stack(files)
         assert "python" in stack
 
     with tempfile.TemporaryDirectory() as tmpdir:
         (Path(tmpdir) / "package.json").write_text("{}")
-        stack = gen._detect_tech_stack(Path(tmpdir))
+        files = gen._scan_files(Path(tmpdir))
+        stack = gen._detect_tech_stack(files)
         assert "node" in stack
