@@ -75,29 +75,30 @@ def build_tester_messages(state: dict) -> list[dict]:
 
 
 def _extract_test_passed(summary: str, had_execution_errors: bool) -> bool:
-    """Determine if tests passed from the done summary and actual execution results.
-
-    Uses both LLM summary and actual tool execution results for reliability.
-    """
-    # If execute_python returned non-zero, tests failed regardless of summary
+    """Extract test result using structured regex parsing."""
     if had_execution_errors:
         return False
 
+    import re
     summary_lower = summary.lower()
 
-    # 明确的通过指标（优先级高于失败指标）
-    pass_indicators = ["全部通过", "all passed", "all tests passed", "0 fail", "0 error", "0 失败", "0failed"]
-    for indicator in pass_indicators:
-        if indicator in summary_lower:
+    passed_match = re.search(r'(\d+)\s*passed', summary_lower)
+    failed_match = re.search(r'(\d+)\s*failed', summary_lower)
+    error_match = re.search(r'(\d+)\s*error', summary_lower)
+
+    if failed_match and int(failed_match.group(1)) > 0:
+        return False
+    if error_match and int(error_match.group(1)) > 0:
+        return False
+    if passed_match and int(passed_match.group(1)) > 0:
+        return True
+
+    pass_keywords = ["全部通过", "all passed", "all tests passed",
+                     "0 fail", "0 error", "0失败", "0 failed"]
+    for kw in pass_keywords:
+        if kw in summary_lower:
             return True
 
-    fail_indicators = ["fail", "error", "失败", "0 passed"]
-    for indicator in fail_indicators:
-        if indicator in summary_lower:
-            # 排除 "0 fail", "0失败", "0 error" 等零失败的情况
-            if "0 fail" in summary_lower or "0失败" in summary_lower or "0 失败" in summary_lower or "0 error" in summary_lower:
-                continue
-            return False
     return True
 
 
