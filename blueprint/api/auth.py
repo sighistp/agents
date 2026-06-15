@@ -1,4 +1,4 @@
-﻿"""JWT authentication and password hashing for Blueprint.
+"""JWT authentication and password hashing for Blueprint.
 
 Adapted from RAGv3 auth system.
 """
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # ---------------------------------------------------------------------------
 _JWT_SECRET: str | None = None
 _JWT_ALGORITHM: str = "HS256"
-_SECRET_FILE = Path(__file__).parent.parent / ".BLUEPRINT_secret"
+_SECRET_FILE = Path(__file__).parent.parent / ".blueprint_secret"
 
 
 def _get_jwt_secret() -> str:

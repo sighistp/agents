@@ -56,7 +56,7 @@ def _resolve_safe_path(path: str, project_dir: str) -> str:
     # Block access to sensitive files (C4: prevent settings.json overwrite)
     blocked_names = {
         '.env', '.env.local', '.env.production', '.gitconfig', '.ssh',
-        'settings.json', 'api_presets.json', '.BLUEPRINT_secret',
+        'settings.json', 'api_presets.json', '.blueprint_secret',
         'config.py', 'config.json', 'credentials.json',
     }
     if resolved.name in blocked_names:
@@ -105,7 +105,7 @@ def _execute_python(args, project_dir):
     # Create a working directory with project files (excluding sensitive ones)
     with tempfile.TemporaryDirectory() as workdir:
         if project_dir and os.path.isdir(project_dir):
-            sensitive_names = {'.env', '.env.local', '.BLUEPRINT_secret', 'settings.json', '.git',
+            sensitive_names = {'.env', '.env.local', '.blueprint_secret', 'settings.json', '.git',
                                'node_modules', '__pycache__', 'venv', '.venv', '.superpowers'}
             for item in os.listdir(project_dir):
                 if item in sensitive_names or item.startswith('.'):

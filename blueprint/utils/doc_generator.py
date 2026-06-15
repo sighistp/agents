@@ -41,7 +41,7 @@ class DocGenerator:
         file_list = "\n".join(f"- `{f.name}`" for f in files[:20])
         tech_str = ", ".join(tech_stack)
 
-        return f"""# {requirement[:50]}
+        readme = f"""# {requirement[:50]}
 
 ## 简介
 {requirement}
@@ -54,7 +54,6 @@ class DocGenerator:
 
 ## 安装与运行
 """
-        # Add run instructions based on tech stack
         if "python" in tech_stack:
             readme += "```bash\npip install -r requirements.txt\npython main.py\n```\n"
         if "node" in tech_stack:
