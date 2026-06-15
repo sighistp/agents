@@ -1,7 +1,7 @@
 <template>
   <div class="login-container">
     <div class="login-card">
-      <h1>DevTeam</h1>
+      <h1>Blueprint</h1>
       <p class="subtitle">AI 开发团队</p>
       <form @submit.prevent="handleSubmit">
         <div class="form-group">

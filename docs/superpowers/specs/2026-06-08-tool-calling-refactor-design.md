@@ -1,4 +1,4 @@
-# DevTeam Agent 工具调用重构设计文档
+﻿# Blueprint Agent 工具调用重构设计文档
 
 > **日期：** 2026-06-08
 > **状态：** 设计定稿
@@ -131,7 +131,7 @@ REVIEWER_TOOLS = [FILE_READ, DONE]
 
 import os
 import json
-from devteam.sandbox.executor import execute_python as sandbox_execute_python
+from Blueprint.sandbox.executor import execute_python as sandbox_execute_python
 
 def execute_tool(call, project_dir: str) -> str:
     """执行 LLM 返回的 tool_call，返回 JSON 字符串结果。
@@ -236,8 +236,8 @@ def serialize_call(call) -> dict:
     }
 
 def developer_agent(state: ProjectState) -> dict:
-    from devteam.agents.tools import DEVELOPER_TOOLS
-    from devteam.agents.tool_executor import execute_tool
+    from Blueprint.agents.tools import DEVELOPER_TOOLS
+    from Blueprint.agents.tool_executor import execute_tool
 
     messages = [
         {"role": "system", "content": DEVELOPER_SYSTEM_PROMPT},

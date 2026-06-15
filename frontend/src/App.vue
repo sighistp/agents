@@ -3,7 +3,7 @@
   <InterruptDialog />
   <div class="app-layout">
     <nav v-if="authStore.isLoggedIn" class="navbar">
-      <div class="nav-brand">DevTeam</div>
+      <div class="nav-brand">Blueprint</div>
       <div class="nav-links">
         <router-link to="/">工作台</router-link>
         <router-link to="/projects">项目</router-link>

@@ -1,4 +1,4 @@
-# DevTeam 工具调用重构实现计划（TDD）
+﻿# Blueprint 工具调用重构实现计划（TDD）
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task.
 
@@ -15,7 +15,7 @@
 ## 文件结构
 
 ```
-devteam/
+Blueprint/
 ├── agents/
 │   ├── tools.py              ← 新建：工具定义 + 工具集分组
 │   ├── tool_executor.py      ← 新建：execute_tool + 路径校验
@@ -41,16 +41,16 @@ devteam/
 ### Task 1: 工具定义（TDD）
 
 **Files:**
-- Create: `devteam/agents/tools.py`
-- Create: `devteam/tests/test_tools.py`
+- Create: `Blueprint/agents/tools.py`
+- Create: `Blueprint/tests/test_tools.py`
 
 - [ ] **Step 1: 写失败的测试**
 
 ```python
-# devteam/tests/test_tools.py
+# Blueprint/tests/test_tools.py
 import json
 import pytest
-from devteam.agents.tools import (
+from Blueprint.agents.tools import (
     FILE_WRITE, FILE_READ, EXECUTE_PYTHON, DONE,
     DEVELOPER_TOOLS, TESTER_TOOLS, REVIEWER_TOOLS,
     serialize_call,
@@ -130,15 +130,15 @@ def test_serialize_call():
 - [ ] **Step 2: 运行测试，验证失败**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_tools.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_tools.py -v
 ```
 
-Expected: FAIL — `ModuleNotFoundError: No module named 'devteam.agents.tools'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'Blueprint.agents.tools'`
 
 - [ ] **Step 3: 写最小实现**
 
 ```python
-# devteam/agents/tools.py
+# Blueprint/agents/tools.py
 """工具定义：OpenAI function calling 格式"""
 import json
 from typing import Any
@@ -243,7 +243,7 @@ def serialize_call(call: Any) -> dict:
 - [ ] **Step 4: 运行测试，验证通过**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_tools.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_tools.py -v
 ```
 
 Expected: 8 tests passed
@@ -253,18 +253,18 @@ Expected: 8 tests passed
 ### Task 2: 工具执行引擎（TDD）
 
 **Files:**
-- Create: `devteam/agents/tool_executor.py`
-- Create: `devteam/tests/test_tool_executor.py`
+- Create: `Blueprint/agents/tool_executor.py`
+- Create: `Blueprint/tests/test_tool_executor.py`
 
 - [ ] **Step 1: 写失败的测试**
 
 ```python
-# devteam/tests/test_tool_executor.py
+# Blueprint/tests/test_tool_executor.py
 import json
 import os
 import pytest
 import tempfile
-from devteam.agents.tool_executor import execute_tool, _validate_path
+from Blueprint.agents.tool_executor import execute_tool, _validate_path
 
 
 class MockCall:
@@ -355,7 +355,7 @@ def test_validate_path_rejects_empty():
 - [ ] **Step 2: 运行测试，验证失败**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_tool_executor.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_tool_executor.py -v
 ```
 
 Expected: FAIL
@@ -363,7 +363,7 @@ Expected: FAIL
 - [ ] **Step 3: 写最小实现**
 
 ```python
-# devteam/agents/tool_executor.py
+# Blueprint/agents/tool_executor.py
 """工具执行引擎：执行 LLM 返回的 tool_call，返回 JSON 结果"""
 import json
 import os
@@ -410,7 +410,7 @@ def _file_read(args: dict, project_dir: str) -> str:
 
 
 def _execute_python(args: dict) -> str:
-    from devteam.sandbox.executor import execute_python as sandbox_exec
+    from Blueprint.sandbox.executor import execute_python as sandbox_exec
     timeout = min(args.get("timeout", 15), 30)
     result = sandbox_exec(args["code"], timeout=timeout)
     return json.dumps(result)
@@ -428,7 +428,7 @@ def _validate_path(path: str, project_dir: str):
 - [ ] **Step 4: 运行测试，验证通过**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_tool_executor.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_tool_executor.py -v
 ```
 
 Expected: 11 tests passed
@@ -438,34 +438,34 @@ Expected: 11 tests passed
 ### Task 3: LLM 工具调用封装（TDD）
 
 **Files:**
-- Modify: `devteam/utils/llm.py`
-- Create: `devteam/tests/test_llm_tools.py`
+- Modify: `Blueprint/utils/llm.py`
+- Create: `Blueprint/tests/test_llm_tools.py`
 
 - [ ] **Step 1: 写失败的测试**
 
 ```python
-# devteam/tests/test_llm_tools.py
+# Blueprint/tests/test_llm_tools.py
 import pytest
 from unittest.mock import MagicMock, patch
 
 
 def test_call_llm_with_tools_exists():
     """call_llm_with_tools 应可导入"""
-    from devteam.utils.llm import call_llm_with_tools
+    from Blueprint.utils.llm import call_llm_with_tools
     assert callable(call_llm_with_tools)
 
 
 def test_call_llm_with_tools_binds_tools():
     """call_llm_with_tools 应调用 llm.bind_tools"""
-    from devteam.utils.llm import call_llm_with_tools
-    from devteam.agents.tools import DEVELOPER_TOOLS
+    from Blueprint.utils.llm import call_llm_with_tools
+    from Blueprint.agents.tools import DEVELOPER_TOOLS
 
     mock_llm = MagicMock()
     mock_llm_with_tools = MagicMock()
     mock_llm.bind_tools.return_value = mock_llm_with_tools
     mock_llm_with_tools.invoke.return_value = MagicMock(content="ok", tool_calls=[])
 
-    with patch("devteam.utils.llm._get_llm", return_value=mock_llm):
+    with patch("Blueprint.utils.llm._get_llm", return_value=mock_llm):
         result = call_llm_with_tools([{"role": "user", "content": "test"}], DEVELOPER_TOOLS)
 
     mock_llm.bind_tools.assert_called_once_with(DEVELOPER_TOOLS)
@@ -475,14 +475,14 @@ def test_call_llm_with_tools_binds_tools():
 - [ ] **Step 2: 运行测试，验证失败**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_llm_tools.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_llm_tools.py -v
 ```
 
 Expected: FAIL — `ImportError: cannot import name 'call_llm_with_tools'`
 
 - [ ] **Step 3: 写最小实现**
 
-在 `devteam/utils/llm.py` 末尾加：
+在 `Blueprint/utils/llm.py` 末尾加：
 
 ```python
 def call_llm_with_tools(messages: list, tools: list):
@@ -503,7 +503,7 @@ def call_llm_with_tools(messages: list, tools: list):
 - [ ] **Step 4: 运行测试，验证通过**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_llm_tools.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_llm_tools.py -v
 ```
 
 Expected: 2 tests passed
@@ -513,13 +513,13 @@ Expected: 2 tests passed
 ### Task 4: Developer Agent 重写（TDD）
 
 **Files:**
-- Modify: `devteam/agents/developer.py`
-- Modify: `devteam/tests/test_developer.py`
+- Modify: `Blueprint/agents/developer.py`
+- Modify: `Blueprint/tests/test_developer.py`
 
 - [ ] **Step 1: 写失败的测试**
 
 ```python
-# devteam/tests/test_developer.py
+# Blueprint/tests/test_developer.py
 import json
 import pytest
 from unittest.mock import patch, MagicMock
@@ -544,8 +544,8 @@ def _make_response(content="", tool_calls=None):
 
 def test_developer_uses_tools():
     """Developer 应使用工具循环而非 JSON 输出"""
-    from devteam.agents.developer import developer_agent
-    from devteam.agents.state import create_initial_state
+    from Blueprint.agents.developer import developer_agent
+    from Blueprint.agents.state import create_initial_state
 
     state = create_initial_state("test-dev", "Build a calculator")
 
@@ -555,8 +555,8 @@ def test_developer_uses_tools():
         _make_response("", [_make_tool_call("done", {"summary": "完成"})]),
     ]
 
-    with patch("devteam.agents.developer.call_llm_with_tools", side_effect=responses):
-        with patch("devteam.agents.tool_executor.execute_tool") as mock_exec:
+    with patch("Blueprint.agents.developer.call_llm_with_tools", side_effect=responses):
+        with patch("Blueprint.agents.tool_executor.execute_tool") as mock_exec:
             mock_exec.return_value = json.dumps({"success": True, "path": "main.py"})
             result = developer_agent(state)
 
@@ -567,8 +567,8 @@ def test_developer_uses_tools():
 
 def test_developer_returns_key_decisions():
     """Developer done 工具的 key_decisions 应传入返回值"""
-    from devteam.agents.developer import developer_agent
-    from devteam.agents.state import create_initial_state
+    from Blueprint.agents.developer import developer_agent
+    from Blueprint.agents.state import create_initial_state
 
     state = create_initial_state("test-dev", "Build a calculator")
 
@@ -577,8 +577,8 @@ def test_developer_returns_key_decisions():
         _make_response("", [_make_tool_call("done", {"summary": "完成", "key_decisions": ["用Flask"]})]),
     ]
 
-    with patch("devteam.agents.developer.call_llm_with_tools", side_effect=responses):
-        with patch("devteam.agents.tool_executor.execute_tool") as mock_exec:
+    with patch("Blueprint.agents.developer.call_llm_with_tools", side_effect=responses):
+        with patch("Blueprint.agents.tool_executor.execute_tool") as mock_exec:
             mock_exec.return_value = json.dumps({"success": True, "path": "a.py"})
             result = developer_agent(state)
 
@@ -588,8 +588,8 @@ def test_developer_returns_key_decisions():
 
 def test_developer_handles_no_tool_calls():
     """LLM 不调工具时应当作隐式完成"""
-    from devteam.agents.developer import developer_agent
-    from devteam.agents.state import create_initial_state
+    from Blueprint.agents.developer import developer_agent
+    from Blueprint.agents.state import create_initial_state
 
     state = create_initial_state("test-dev", "Build a calculator")
 
@@ -598,8 +598,8 @@ def test_developer_handles_no_tool_calls():
         _make_response("我完成了"),  # 没有 tool_calls
     ]
 
-    with patch("devteam.agents.developer.call_llm_with_tools", side_effect=responses):
-        with patch("devteam.agents.tool_executor.execute_tool") as mock_exec:
+    with patch("Blueprint.agents.developer.call_llm_with_tools", side_effect=responses):
+        with patch("Blueprint.agents.tool_executor.execute_tool") as mock_exec:
             mock_exec.return_value = json.dumps({"success": True, "path": "a.py"})
             result = developer_agent(state)
 
@@ -609,16 +609,16 @@ def test_developer_handles_no_tool_calls():
 
 def test_developer_max_steps():
     """超过最大步数应返回错误"""
-    from devteam.agents.developer import developer_agent
-    from devteam.agents.state import create_initial_state
+    from Blueprint.agents.developer import developer_agent
+    from Blueprint.agents.state import create_initial_state
 
     state = create_initial_state("test-dev", "Build a calculator")
 
     # 每次都返回 file_write，永不 done
     always_write = _make_response("", [_make_tool_call("file_write", {"path": "a.py", "content": "x=1"})])
 
-    with patch("devteam.agents.developer.call_llm_with_tools", return_value=always_write):
-        with patch("devteam.agents.tool_executor.execute_tool") as mock_exec:
+    with patch("Blueprint.agents.developer.call_llm_with_tools", return_value=always_write):
+        with patch("Blueprint.agents.tool_executor.execute_tool") as mock_exec:
             mock_exec.return_value = json.dumps({"success": True, "path": "a.py"})
             result = developer_agent(state)
 
@@ -629,7 +629,7 @@ def test_developer_max_steps():
 - [ ] **Step 2: 运行测试，验证失败**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_developer.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_developer.py -v
 ```
 
 Expected: FAIL
@@ -637,15 +637,15 @@ Expected: FAIL
 - [ ] **Step 3: 重写 developer.py**
 
 ```python
-# devteam/agents/developer.py
+# Blueprint/agents/developer.py
 """Developer Agent: 用工具循环生成代码"""
 import json
 import logging
 from typing import Any
 
-from devteam.agents.tools import DEVELOPER_TOOLS, serialize_call
-from devteam.agents.tool_executor import execute_tool
-from devteam.utils.llm import call_llm_with_tools
+from Blueprint.agents.tools import DEVELOPER_TOOLS, serialize_call
+from Blueprint.agents.tool_executor import execute_tool
+from Blueprint.utils.llm import call_llm_with_tools
 
 logger = logging.getLogger(__name__)
 
@@ -753,7 +753,7 @@ def developer_agent(state: dict) -> dict[str, Any]:
 - [ ] **Step 4: 运行测试，验证通过**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_developer.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_developer.py -v
 ```
 
 Expected: 4 tests passed
@@ -763,13 +763,13 @@ Expected: 4 tests passed
 ### Task 5: Tester Agent 重写（TDD）
 
 **Files:**
-- Modify: `devteam/agents/tester.py`
-- Modify: `devteam/tests/test_tester.py`
+- Modify: `Blueprint/agents/tester.py`
+- Modify: `Blueprint/tests/test_tester.py`
 
 - [ ] **Step 1: 写失败的测试**
 
 ```python
-# devteam/tests/test_tester.py
+# Blueprint/tests/test_tester.py
 import json
 import pytest
 from unittest.mock import patch, MagicMock
@@ -792,8 +792,8 @@ def _make_response(content="", tool_calls=None):
 
 def test_tester_uses_tools():
     """Tester 应使用工具循环"""
-    from devteam.agents.tester import tester_agent
-    from devteam.agents.state import create_initial_state
+    from Blueprint.agents.tester import tester_agent
+    from Blueprint.agents.state import create_initial_state
 
     state = create_initial_state("test-test", "Build a calculator")
     state["files"] = {"main.py": "print(1)"}
@@ -803,8 +803,8 @@ def test_tester_uses_tools():
         _make_response("", [_make_tool_call("done", {"summary": "1 passed, 0 failed"})]),
     ]
 
-    with patch("devteam.agents.tester.call_llm_with_tools", side_effect=responses):
-        with patch("devteam.agents.tool_executor.execute_tool") as mock_exec:
+    with patch("Blueprint.agents.tester.call_llm_with_tools", side_effect=responses):
+        with patch("Blueprint.agents.tool_executor.execute_tool") as mock_exec:
             mock_exec.return_value = json.dumps({"returncode": 0, "stdout": "1\n", "stderr": ""})
             result = tester_agent(state)
 
@@ -814,7 +814,7 @@ def test_tester_uses_tools():
 
 def test_tester_only_has_read_and_execute_tools():
     """Tester 不应有 file_write 工具"""
-    from devteam.agents.tools import TESTER_TOOLS
+    from Blueprint.agents.tools import TESTER_TOOLS
     names = [t["function"]["name"] for t in TESTER_TOOLS]
     assert "file_write" not in names
     assert "file_read" in names
@@ -825,7 +825,7 @@ def test_tester_only_has_read_and_execute_tools():
 - [ ] **Step 2: 运行测试，验证失败**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_tester.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_tester.py -v
 ```
 
 Expected: FAIL
@@ -841,7 +841,7 @@ Expected: FAIL
 - [ ] **Step 4: 运行测试，验证通过**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_tester.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_tester.py -v
 ```
 
 Expected: 2 tests passed
@@ -851,13 +851,13 @@ Expected: 2 tests passed
 ### Task 6: Reviewer Agent 重写（TDD）
 
 **Files:**
-- Modify: `devteam/agents/reviewer.py`
-- Modify: `devteam/tests/test_reviewer.py`
+- Modify: `Blueprint/agents/reviewer.py`
+- Modify: `Blueprint/tests/test_reviewer.py`
 
 - [ ] **Step 1: 写失败的测试**
 
 ```python
-# devteam/tests/test_reviewer.py
+# Blueprint/tests/test_reviewer.py
 import json
 import pytest
 from unittest.mock import patch, MagicMock
@@ -880,8 +880,8 @@ def _make_response(content="", tool_calls=None):
 
 def test_reviewer_uses_tools():
     """Reviewer 应使用工具循环"""
-    from devteam.agents.reviewer import reviewer_agent
-    from devteam.agents.state import create_initial_state
+    from Blueprint.agents.reviewer import reviewer_agent
+    from Blueprint.agents.state import create_initial_state
 
     state = create_initial_state("test-review", "Build a calculator")
     state["files"] = {"main.py": "print(1)"}
@@ -891,8 +891,8 @@ def test_reviewer_uses_tools():
         _make_response("", [_make_tool_call("done", {"summary": "代码质量良好，无critical问题"})]),
     ]
 
-    with patch("devteam.agents.reviewer.call_llm_with_tools", side_effect=responses):
-        with patch("devteam.agents.tool_executor.execute_tool") as mock_exec:
+    with patch("Blueprint.agents.reviewer.call_llm_with_tools", side_effect=responses):
+        with patch("Blueprint.agents.tool_executor.execute_tool") as mock_exec:
             mock_exec.return_value = json.dumps({"content": "print(1)"})
             result = reviewer_agent(state)
 
@@ -902,7 +902,7 @@ def test_reviewer_uses_tools():
 
 def test_reviewer_only_has_read_tool():
     """Reviewer 不应有 file_write 或 execute_python"""
-    from devteam.agents.tools import REVIEWER_TOOLS
+    from Blueprint.agents.tools import REVIEWER_TOOLS
     names = [t["function"]["name"] for t in REVIEWER_TOOLS]
     assert "file_write" not in names
     assert "execute_python" not in names
@@ -913,7 +913,7 @@ def test_reviewer_only_has_read_tool():
 - [ ] **Step 2: 运行测试，验证失败**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_reviewer.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_reviewer.py -v
 ```
 
 Expected: FAIL
@@ -929,7 +929,7 @@ Expected: FAIL
 - [ ] **Step 4: 运行测试，验证通过**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_reviewer.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_reviewer.py -v
 ```
 
 Expected: 2 tests passed
@@ -939,8 +939,8 @@ Expected: 2 tests passed
 ### Task 7: Graph 集成（TDD）
 
 **Files:**
-- Modify: `devteam/agents/graph.py`
-- Modify: `devteam/tests/test_graph.py`
+- Modify: `Blueprint/agents/graph.py`
+- Modify: `Blueprint/tests/test_graph.py`
 
 - [ ] **Step 1: 更新路由函数**
 
@@ -962,7 +962,7 @@ def route_after_developer(state: ProjectState) -> str:
 - [ ] **Step 2: 运行图测试**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/test_graph.py -v
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/test_graph.py -v
 ```
 
 Expected: 15 tests passed（图结构不变，路由函数逻辑不变）
@@ -970,7 +970,7 @@ Expected: 15 tests passed（图结构不变，路由函数逻辑不变）
 - [ ] **Step 3: 运行全部测试**
 
 ```bash
-cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest devteam/tests/ -q
+cd "c:/Users/lahm/Desktop/Many AgentS" && python -m pytest Blueprint/tests/ -q
 ```
 
 Expected: ALL tests passed

@@ -1,4 +1,4 @@
-# DevTeam 前端 Vue 3 SPA 重构实现计划（TDD）
+﻿# Blueprint 前端 Vue 3 SPA 重构实现计划（TDD）
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -152,7 +152,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../devteam/static',
+    outDir: '../Blueprint/static',
     emptyOutDir: true,
   },
 })
@@ -564,7 +564,7 @@ app.mount('#app')
 ```vue
 <!-- frontend/src/App.vue -->
 <template>
-  <div id="app">DevTeam</div>
+  <div id="app">Blueprint</div>
 </template>
 ```
 
@@ -1610,7 +1610,7 @@ const statusText = computed(() => {
   <LoadingBar />
   <div class="app-layout">
     <nav v-if="authStore.isLoggedIn" class="navbar">
-      <div class="nav-brand">DevTeam</div>
+      <div class="nav-brand">Blueprint</div>
       <div class="nav-links">
         <router-link to="/">工作台</router-link>
         <router-link to="/projects">项目</router-link>
@@ -1741,7 +1741,7 @@ Expected: FAIL
 <template>
   <div class="login-container">
     <div class="login-card">
-      <h1>DevTeam</h1>
+      <h1>Blueprint</h1>
       <p class="subtitle">AI 开发团队</p>
       <form @submit.prevent="handleSubmit">
         <div class="form-group">
@@ -2000,20 +2000,20 @@ Expected: ALL tests passed
 cd frontend && npm run build
 ```
 
-Expected: 构建产物输出到 `devteam/static/`
+Expected: 构建产物输出到 `Blueprint/static/`
 
 - [ ] **Step 3: 验证生产模式**
 
 ```bash
 cd "c:/Users/lahm/Desktop/Many AgentS"
-python -m devteam.start
+python -m Blueprint.start
 ```
 
 访问 `http://localhost:8080`，应看到新的 Vue 3 前端。
 
 - [ ] **Step 4: 删除旧 HTML 文件**
 
-确认新前端工作正常后，删除 `devteam/static/` 下的旧 HTML 文件。
+确认新前端工作正常后，删除 `Blueprint/static/` 下的旧 HTML 文件。
 
 ---
 

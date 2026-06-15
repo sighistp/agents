@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../devteam/static',
+    outDir: '../blueprint/static',
     emptyOutDir: true,
   },
 })

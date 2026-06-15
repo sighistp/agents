@@ -1,5 +1,6 @@
 <template>
   <div class="flow-panel">
+    <ToolProgress v-if="projectStore.toolProgress" :progress="projectStore.toolProgress" />
     <div class="flow-title">Agent 协作流程</div>
     <div class="agents-grid">
       <AgentCard v-for="agent in projectStore.agentList" :key="agent.name" :name="agent.name" :status="agent.status" />
@@ -16,6 +17,7 @@ import AgentCard from './AgentCard.vue'
 import IterationInfo from './IterationInfo.vue'
 import OutputPanel from './OutputPanel.vue'
 import DiscussionPanel from './DiscussionPanel.vue'
+import ToolProgress from './ToolProgress.vue'
 
 const projectStore = useProjectStore()
 </script>

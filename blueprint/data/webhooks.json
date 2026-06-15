@@ -1,0 +1,25 @@
+{
+  "webhooks": [
+    {
+      "url": "http://example.com/hook",
+      "events": [
+        "*"
+      ],
+      "secret": null
+    },
+    {
+      "url": "http://a.com",
+      "events": [
+        "*"
+      ],
+      "secret": null
+    },
+    {
+      "url": "http://b.com",
+      "events": [
+        "failed"
+      ],
+      "secret": null
+    }
+  ]
+}

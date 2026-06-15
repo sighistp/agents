@@ -10,12 +10,14 @@ export const useProjectStore = defineStore('project', {
     files: {},
     interrupt: null,
     agentStartTime: {},
-    agentOutputs: {},  // {agentName: {files, test_results, review_comments, ...}}
+    agentOutputs: {},
     isPaused: false,
     isRunning: false,
     saveDialogVisible: false,
     autoSaveName: '',
     pendingRequirement: null,
+    toolProgress: null,
+    costData: null,
   }),
   getters: {
     agentList: (state) => {
@@ -110,6 +112,15 @@ export const useProjectStore = defineStore('project', {
         console.error('Failed to restore project state:', e)
         return false
       }
+    },
+    setToolProgress(data) {
+      this.toolProgress = data
+    },
+    clearToolProgress() {
+      this.toolProgress = null
+    },
+    setCostData(data) {
+      this.costData = data
     },
   },
 })

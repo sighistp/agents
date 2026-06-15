@@ -1,4 +1,4 @@
-# DevTeam 通讯页面 UX 改进设计
+﻿# Blueprint 通讯页面 UX 改进设计
 
 > 日期：2026-06-11
 > 范围：WorkbenchPage（通讯页面）+ ChatPanel + FlowPanel

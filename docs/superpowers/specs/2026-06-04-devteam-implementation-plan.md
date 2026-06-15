@@ -1,7 +1,7 @@
-# DevTeam 实现计划
+﻿# Blueprint 实现计划
 
 > **日期：** 2026-06-04
-> **设计文档：** [2026-06-04-devteam-multi-agent-design.md](./2026-06-04-devteam-multi-agent-design.md)
+> **设计文档：** [2026-06-04-Blueprint-multi-agent-design.md](./2026-06-04-Blueprint-multi-agent-design.md)
 > **总工期：** 约11天
 
 ---
@@ -34,7 +34,7 @@ interrupt机制依赖WebSocket：图执行到interrupt节点→暂停→通过We
 
 ```
 1. 项目结构
-   ├── devteam/
+   ├── Blueprint/
    │   ├── __init__.py
    │   ├── config.py          # 配置（复用RAGv3模式）
    │   ├── main.py            # FastAPI入口
@@ -225,7 +225,7 @@ PM节点能分析需求，输出用户故事和功能清单。
 ### 验证方式
 ```python
 # 单独测试PM节点
-from devteam.agents.pm import pm_agent
+from Blueprint.agents.pm import pm_agent
 state = {"requirement": "做一个待办事项Web应用", "iteration": 0, ...}
 result = pm_agent(state)
 print(result["user_stories"])  # 应该有多个用户故事

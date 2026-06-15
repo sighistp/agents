@@ -43,18 +43,18 @@ projects/
 node_modules/
 
 # Build output (rebuilt from source)
-devteam/static/assets/
-devteam/static/index.html
-devteam/static/favicon.svg
-devteam/static/icons.svg
+blueprint/static/assets/
+blueprint/static/index.html
+blueprint/static/favicon.svg
+blueprint/static/icons.svg
 
 # Runtime data
-devteam/data/settings.json
-devteam/data/api_presets.json
-.devteam_secret
+blueprint/data/settings.json
+blueprint/data/api_presets.json
+.blueprint_secret
 
 # Projects (generated output)
-devteam/projects/
+blueprint/projects/
 
 # OS
 .DS_Store

@@ -1,4 +1,4 @@
-# Workbench UX 改进实施计划
+﻿# Workbench UX 改进实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -24,7 +24,7 @@
 | `frontend/src/__tests__/components/AgentOutputCard.test.js` | AgentOutputCard 测试 |
 | `frontend/src/__tests__/components/SaveDialog.test.js` | SaveDialog 测试 |
 | `frontend/src/__tests__/components/ChatHeader.test.js` | ChatHeader 测试 |
-| `devteam/tests/test_websocket_pause.py` | pause/stop/resume 后端测试 |
+| `Blueprint/tests/test_websocket_pause.py` | pause/stop/resume 后端测试 |
 
 ### 修改文件
 
@@ -36,8 +36,8 @@
 | `frontend/src/components/AgentCard.vue` | 可交互（点击展开/折叠 + 耗时） |
 | `frontend/src/components/IterationInfo.vue` | 进度条加粗 + 变色 |
 | `frontend/src/components/OutputPanel.vue` | 文件预览（useFilePreview） |
-| `devteam/api/websocket.py` | pause/stop/resume 消息处理 + 心跳 + 节点边界检查 |
-| `devteam/api/projects.py` | POST 新增 name 字段 + GET 返回 name |
+| `Blueprint/api/websocket.py` | pause/stop/resume 消息处理 + 心跳 + 节点边界检查 |
+| `Blueprint/api/projects.py` | POST 新增 name 字段 + GET 返回 name |
 | `frontend/package.json` | 新增 highlight.js 依赖 |
 
 ---
@@ -612,13 +612,13 @@ git commit -m "feat: enhance IterationInfo with color-coded progress bar"
 ### Task 6: 后端 WebSocket pause/stop/resume
 
 **Files:**
-- Modify: `devteam/api/websocket.py`
-- Create: `devteam/tests/test_websocket_pause.py`
+- Modify: `Blueprint/api/websocket.py`
+- Create: `Blueprint/tests/test_websocket_pause.py`
 
 - [ ] **Step 1: 写失败测试**
 
 ```python
-# devteam/tests/test_websocket_pause.py
+# Blueprint/tests/test_websocket_pause.py
 import pytest
 import asyncio
 import threading
@@ -627,34 +627,34 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 def test_pause_handler_exists():
     """pause 消息处理逻辑应存在"""
-    import devteam.api.websocket as ws_mod
+    import Blueprint.api.websocket as ws_mod
     source = inspect.getsource(ws_mod.ws_project)
     assert 'msg_type == "pause"' in source
     assert 'stop_event.set()' in source
 
 def test_resume_handler_exists():
     """resume_execution 消息处理逻辑应存在"""
-    import devteam.api.websocket as ws_mod
+    import Blueprint.api.websocket as ws_mod
     source = inspect.getsource(ws_mod.ws_project)
     assert 'msg_type == "resume_execution"' in source
     assert 'stop_event.clear()' in source
 
 def test_stop_handler_exists():
     """stop 消息处理逻辑应存在"""
-    import devteam.api.websocket as ws_mod
+    import Blueprint.api.websocket as ws_mod
     source = inspect.getsource(ws_mod.ws_project)
     assert 'msg_type == "stop"' in source
 
 def test_heartbeat_function_exists():
     """_send_heartbeat 函数应存在且为 async"""
-    from devteam.api.websocket import _send_heartbeat
+    from Blueprint.api.websocket import _send_heartbeat
     assert callable(_send_heartbeat)
     assert inspect.iscoroutinefunction(_send_heartbeat)
 
 @pytest.mark.asyncio
 async def test_heartbeat_sends_messages():
     """_send_heartbeat 应在暂停期间发送心跳"""
-    from devteam.api.websocket import _send_heartbeat
+    from Blueprint.api.websocket import _send_heartbeat
 
     ws = AsyncMock()
     paused = [True]
@@ -683,13 +683,13 @@ async def test_heartbeat_sends_messages():
 
 def test_node_boundary_check_in_graph():
     """_run_async 中应在节点边界检查 stop_event"""
-    import devteam.api.websocket as ws_mod
+    import Blueprint.api.websocket as ws_mod
     source = inspect.getsource(ws_mod._run_graph_sync)
     assert 'stop_event.is_set()' in source
 
 def test_pause_state_variable_exists():
     """ws_project 中应有 paused 状态变量"""
-    import devteam.api.websocket as ws_mod
+    import Blueprint.api.websocket as ws_mod
     source = inspect.getsource(ws_mod.ws_project)
     assert 'paused' in source
 ```
@@ -697,12 +697,12 @@ def test_pause_state_variable_exists():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/test_websocket_pause.py -v
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/test_websocket_pause.py -v
 ```
 
 - [ ] **Step 3: 实现 pause/stop/resume**
 
-在 `devteam/api/websocket.py` 的 `ws_project` 函数中：
+在 `Blueprint/api/websocket.py` 的 `ws_project` 函数中：
 
 1. 新增 `paused = False` 和 `heartbeat_task = None` 变量
 2. 新增 `_send_heartbeat` 异步函数
@@ -712,19 +712,19 @@ cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/test_we
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/test_websocket_pause.py -v
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/test_websocket_pause.py -v
 ```
 
 - [ ] **Step 5: 运行全量测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/ -q
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/ -q
 ```
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add devteam/api/websocket.py devteam/tests/test_websocket_pause.py
+git add Blueprint/api/websocket.py Blueprint/tests/test_websocket_pause.py
 git commit -m "feat: add pause/stop/resume WebSocket handling with heartbeat"
 ```
 
@@ -968,13 +968,13 @@ git commit -m "refactor: ChatPanel uses ChatHeader component"
 ### Task 8: 保存命名（前端 + 后端）
 
 **Files:**
-- Modify: `devteam/api/projects.py`
+- Modify: `Blueprint/api/projects.py`
 - Modify: `frontend/src/stores/project.js`
 - Modify: `frontend/src/components/ChatPanel.vue`
 
 - [ ] **Step 1: 后端 POST 新增 name 字段**
 
-在 `devteam/api/projects.py` 的 `ProjectCreate` 模型中新增 `name: Optional[str] = None`，在 `create_project` 中存入 meta.json。
+在 `Blueprint/api/projects.py` 的 `ProjectCreate` 模型中新增 `name: Optional[str] = None`，在 `create_project` 中存入 meta.json。
 
 - [ ] **Step 2: 后端 GET 返回 name 字段**
 
@@ -991,7 +991,7 @@ git commit -m "refactor: ChatPanel uses ChatHeader component"
 - [ ] **Step 5: 运行后端测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/test_file_api.py -v
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/test_file_api.py -v
 ```
 
 - [ ] **Step 6: 构建前端**
@@ -1003,7 +1003,7 @@ cd frontend && npm run build
 - [ ] **Step 7: 提交**
 
 ```bash
-git add devteam/api/projects.py frontend/src/stores/project.js frontend/src/components/ChatPanel.vue
+git add Blueprint/api/projects.py frontend/src/stores/project.js frontend/src/components/ChatPanel.vue
 git commit -m "feat: add project naming with SaveDialog and backend name field"
 ```
 
@@ -1066,7 +1066,7 @@ OutputPanel 预览区 `previewContent` 为空时显示"文件内容为空"占位
 
 ```bash
 cd frontend && npx vitest run && npm run build
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/ -q
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/ -q
 ```
 
 - [ ] **Step 5: 提交**
@@ -1101,7 +1101,7 @@ Task 11 (集成测试) —— 依赖 Task 1-10
 - [ ] **Step 1: 启动服务器手动测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m devteam.start
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m Blueprint.start
 ```
 
 测试清单：
@@ -1117,7 +1117,7 @@ cd "c:\Users\lahm\Desktop\Many AgentS" && python -m devteam.start
 - [ ] **Step 2: 运行全量测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/ -q
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/ -q
 cd frontend && npx vitest run
 ```
 

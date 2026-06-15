@@ -1,4 +1,4 @@
-# DevTeam 前端重构设计文档
+﻿# Blueprint 前端重构设计文档
 
 > **日期：** 2026-06-05
 > **状态：** 设计定稿
@@ -346,8 +346,8 @@ api.interceptors.response.use(
 
 | 阶段 | 前端 | 后端 |
 |------|------|------|
-| 迁移中 | 旧 HTML 在 `devteam/static/`，新 Vue 在 `frontend/` | FastAPI serve 旧 HTML |
-| 迁移完成 | Vue build 产物复制到 `devteam/static/` | FastAPI serve 新前端 |
+| 迁移中 | 旧 HTML 在 `Blueprint/static/`，新 Vue 在 `frontend/` | FastAPI serve 旧 HTML |
+| 迁移完成 | Vue build 产物复制到 `Blueprint/static/` | FastAPI serve 新前端 |
 
 开发时 Vite 跑在 `localhost:5173`，配置代理转发 `/api` 和 `/ws` 到 `localhost:8080`。
 

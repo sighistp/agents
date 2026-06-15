@@ -1,4 +1,4 @@
-# 项目详情页重构实施计划
+﻿# 项目详情页重构实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -20,9 +20,9 @@
 
 | 文件 | 改动 |
 |------|------|
-| `devteam/utils/memory.py` | 新增 `agent_conversations` 表 + `save_conversation()` / `get_conversations()`；`save_execution` 新增 `tool_calls` 参数 |
-| `devteam/api/websocket.py` | 存完整对话到 `agent_conversations`（过滤 system，BaseMessage→dict）；`save_execution` 传 tool_calls |
-| `devteam/api/projects.py` | `GET /state` 返回 name；新增 `GET /conversations`、`GET /executions`、`GET /export` |
+| `Blueprint/utils/memory.py` | 新增 `agent_conversations` 表 + `save_conversation()` / `get_conversations()`；`save_execution` 新增 `tool_calls` 参数 |
+| `Blueprint/api/websocket.py` | 存完整对话到 `agent_conversations`（过滤 system，BaseMessage→dict）；`save_execution` 传 tool_calls |
+| `Blueprint/api/projects.py` | `GET /state` 返回 name；新增 `GET /conversations`、`GET /executions`、`GET /export` |
 | `frontend/src/pages/ProjectDetailPage.vue` | 重写为卡片布局 + 懒加载 + 操作按钮 |
 | `frontend/src/stores/project.js` | 新增 `pendingRequirement` 字段 |
 | `frontend/src/components/ChatPanel.vue` | onMounted 检查 `pendingRequirement` 并自动发送 |
@@ -33,13 +33,13 @@
 ### Task 1: memory.py — agent_conversations 表 + save_execution tool_calls
 
 **Files:**
-- Modify: `devteam/utils/memory.py`
-- Modify: `devteam/tests/test_memory.py`
+- Modify: `Blueprint/utils/memory.py`
+- Modify: `Blueprint/tests/test_memory.py`
 
 - [ ] **Step 1: 写失败测试**
 
 ```python
-# devteam/tests/test_memory.py — 新增测试
+# Blueprint/tests/test_memory.py — 新增测试
 
 def test_save_and_get_conversation(memory_instance):
     """save_conversation 存入对话，get_conversations 读出"""
@@ -75,7 +75,7 @@ def test_save_execution_with_tool_calls(memory_instance):
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/test_memory.py -v
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/test_memory.py -v
 ```
 
 - [ ] **Step 3: 实现**
@@ -91,19 +91,19 @@ cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/test_me
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/test_memory.py -v
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/test_memory.py -v
 ```
 
 - [ ] **Step 5: 运行全量测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/ -q
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/ -q
 ```
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add devteam/utils/memory.py devteam/tests/test_memory.py
+git add Blueprint/utils/memory.py Blueprint/tests/test_memory.py
 git commit -m "feat: add agent_conversations table + tool_calls in save_execution"
 ```
 
@@ -112,7 +112,7 @@ git commit -m "feat: add agent_conversations table + tool_calls in save_executio
 ### Task 2: websocket.py — 存完整对话 + tool_calls
 
 **Files:**
-- Modify: `devteam/api/websocket.py`
+- Modify: `Blueprint/api/websocket.py`
 
 - [ ] **Step 1: 修改消息存储逻辑**
 
@@ -126,13 +126,13 @@ git commit -m "feat: add agent_conversations table + tool_calls in save_executio
 - [ ] **Step 2: 运行后端测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/ -q
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/ -q
 ```
 
 - [ ] **Step 3: 提交**
 
 ```bash
-git add devteam/api/websocket.py
+git add Blueprint/api/websocket.py
 git commit -m "feat: save full conversations + tool_calls to memory"
 ```
 
@@ -141,7 +141,7 @@ git commit -m "feat: save full conversations + tool_calls to memory"
 ### Task 3: projects.py — 新增 API 端点
 
 **Files:**
-- Modify: `devteam/api/projects.py`
+- Modify: `Blueprint/api/projects.py`
 
 - [ ] **Step 1: 修改 GET /state 返回 name**
 
@@ -234,7 +234,7 @@ def export_project(project_id: str):
 - [ ] **Step 5: 写新端点测试**
 
 ```python
-# devteam/tests/test_file_api.py — 新增
+# Blueprint/tests/test_file_api.py — 新增
 
 def test_get_conversations(client, tmp_projects):
     """GET /api/projects/{id}/conversations 返回对话历史"""
@@ -268,13 +268,13 @@ def test_get_state_returns_name(client, tmp_projects):
 - [ ] **Step 6: 运行全部后端测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/ -q
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/ -q
 ```
 
 - [ ] **Step 7: 提交**
 
 ```bash
-git add devteam/api/projects.py devteam/tests/test_file_api.py
+git add Blueprint/api/projects.py Blueprint/tests/test_file_api.py
 git commit -m "feat: add /conversations, /executions, /export endpoints + name in /state"
 ```
 
@@ -442,7 +442,7 @@ git commit -m "feat: auto-send pending requirement from project detail page"
 - [ ] **Step 1: 启动手动测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m devteam.start
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m Blueprint.start
 ```
 
 测试清单：
@@ -458,7 +458,7 @@ cd "c:\Users\lahm\Desktop\Many AgentS" && python -m devteam.start
 - [ ] **Step 2: 运行全量测试**
 
 ```bash
-cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest devteam/tests/ -q
+cd "c:\Users\lahm\Desktop\Many AgentS" && python -m pytest Blueprint/tests/ -q
 cd frontend && npx vitest run
 ```
 

@@ -59,6 +59,13 @@ function handleMessage(data) {
       break
     case 'agent_done':
       projectStore.setAgentStatus(data.agent, 'done')
+      projectStore.clearToolProgress()
+      break
+    case 'tool_progress':
+      projectStore.setToolProgress(data.data)
+      break
+    case 'cost_update':
+      projectStore.setCostData(data.data)
       break
     case 'interrupt':
       projectStore.interrupt = data.data
