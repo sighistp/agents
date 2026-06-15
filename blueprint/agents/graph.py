@@ -113,7 +113,7 @@ def _run_post_deliver_hooks(state: dict, project_dir):
 def save_snapshot_hook(state: dict, project_dir):
     """Save a diff snapshot for the delivered iteration."""
     from blueprint.utils.diff_engine import DiffEngine
-    engine = DiffEngine(str(project_dir.parent.parent / "projects" / project_dir.name))
+    engine = DiffEngine(str(project_dir))
     engine.save_snapshot(state.get("iteration", 0))
 
 
@@ -170,44 +170,52 @@ def generate_deploy_hook(state: dict, project_dir):
 
 
 def webhook_hook(state: dict, project_dir):
-    """Send webhook notification on project delivery."""
+    """Send webhook notification on project delivery (sync, best-effort)."""
     import json as _json
     from pathlib import Path as _Path
-    from blueprint.utils.webhook import WebhookManager
     from blueprint.config import settings
 
-    # Load webhook config from settings file
     config_path = _Path(settings.project_dir if settings.project_dir else "projects").parent / "data" / "webhooks.json"
     if not config_path.exists():
         return
 
     try:
         webhooks_data = _json.loads(config_path.read_text(encoding="utf-8"))
-        wm = WebhookManager()
-        wm.webhooks = webhooks_data.get("webhooks", [])
-
-        if not wm.webhooks:
+        webhooks = webhooks_data.get("webhooks", [])
+        if not webhooks:
             return
 
-        # Send notification (best-effort, sync wrapper)
-        import asyncio
+        import hashlib
+        import hmac
+        import time
+        import httpx
+
         payload = {
-            "project_id": state.get("project_id", ""),
-            "requirement": state.get("requirement", ""),
-            "files_count": len(state.get("files", {})),
-            "iteration": state.get("iteration", 0),
-            "project_dir": str(project_dir),
+            "event": "project.completed",
+            "timestamp": time.time(),
+            "data": {
+                "project_id": state.get("project_id", ""),
+                "requirement": state.get("requirement", ""),
+                "files_count": len(state.get("files", {})),
+                "iteration": state.get("iteration", 0),
+            },
         }
-        try:
-            loop = asyncio.get_running_loop()
-            if loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    pool.submit(asyncio.run, wm.notify("project.completed", payload))
-            else:
-                asyncio.run(wm.notify("project.completed", payload))
-        except RuntimeError:
-            asyncio.run(wm.notify("project.completed", payload))
+        body_bytes = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+        with httpx.Client(timeout=10) as client:
+            for wh in webhooks:
+                events = wh.get("events", ["*"])
+                if "*" not in events and "project.completed" not in events:
+                    continue
+                headers = {"Content-Type": "application/json"}
+                secret = wh.get("secret")
+                if secret:
+                    sig = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+                    headers["X-Webhook-Signature"] = f"sha256={sig}"
+                try:
+                    client.post(wh["url"], content=body_bytes, headers=headers)
+                except Exception:
+                    pass
     except Exception:
         pass
 

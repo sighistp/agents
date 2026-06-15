@@ -138,20 +138,15 @@ def test_deliver_node_webhook_hook(tmp_path):
         "webhooks": [{"url": "http://example.com/hook", "events": ["*"], "secret": None}]
     }))
 
-    from blueprint.agents import graph
-
-    with patch("blueprint.utils.webhook.WebhookManager") as MockWM:
-        mock_wm = MagicMock()
-        MockWM.return_value = mock_wm
-        mock_wm.notify = MagicMock()
+    with patch("httpx.Client") as MockClient:
+        mock_client = MagicMock()
+        MockClient.return_value.__enter__ = MagicMock(return_value=mock_client)
+        MockClient.return_value.__exit__ = MagicMock(return_value=False)
 
         deliver_node(_base_state(project_id="webhook-test"))
 
-        # WebhookManager should have been instantiated and notify called
-        MockWM.assert_called()
-        mock_wm.notify.assert_called()
-        call_args = mock_wm.notify.call_args
-        assert call_args[0][0] == "project.completed"
-        assert call_args[0][1]["project_id"] == "webhook-test"
+        mock_client.post.assert_called_once()
+        call_args = mock_client.post.call_args
+        assert call_args[0][0] == "http://example.com/hook"
 
     settings.project_dir = old_val

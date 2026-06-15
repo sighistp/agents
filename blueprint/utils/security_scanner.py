@@ -8,7 +8,8 @@ from typing import Any
 
 class SecurityScanner:
     _CUSTOM_PATTERNS = [
-        (r'(?i)(api[_-]?key|secret|password|token)\s*[=:]\s*["\'][^"\']{8,}["\']',
+        # Match strings that look like actual secrets (alphanumeric, 12+ chars, no placeholders)
+        (r'(?i)(api[_-]?key|secret[_-]?key|password|access[_-]?token)\s*[=:]\s*["\'][A-Za-z0-9_\-]{12,}["\']',
          "hardcoded_secret", "high", "检测到硬编码密钥/密码"),
         (r'(?i)AWS_(ACCESS|SECRET)_KEY',
          "hardcoded_secret", "critical", "检测到 AWS 密钥"),

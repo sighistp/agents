@@ -3,11 +3,14 @@ import json
 import sqlite3
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 
 class TraceDB:
-    def __init__(self, db_path: str = "blueprint/data/traces.db"):
+    def __init__(self, db_path: str = None):
+        if db_path is None:
+            db_path = str(Path(__file__).parent.parent / "data" / "traces.db")
         self._db_path = db_path
         self._local = threading.local()
         self._init_db()

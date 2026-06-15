@@ -21,23 +21,23 @@ class WebhookManager:
         }
         body_bytes = json.dumps(body, ensure_ascii=False).encode("utf-8")
 
-        for webhook in self.webhooks:
-            events = webhook.get("events", ["*"])
-            if "*" not in events and event not in events:
-                continue
+        async with httpx.AsyncClient(timeout=10) as client:
+            for webhook in self.webhooks:
+                events = webhook.get("events", ["*"])
+                if "*" not in events and event not in events:
+                    continue
 
-            headers = {"Content-Type": "application/json"}
+                headers = {"Content-Type": "application/json"}
 
-            secret = webhook.get("secret")
-            if secret:
-                sig = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
-                headers["X-Webhook-Signature"] = f"sha256={sig}"
+                secret = webhook.get("secret")
+                if secret:
+                    sig = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+                    headers["X-Webhook-Signature"] = f"sha256={sig}"
 
-            try:
-                async with httpx.AsyncClient(timeout=10) as client:
+                try:
                     await client.post(webhook["url"], content=body_bytes, headers=headers)
-            except Exception:
-                pass  # Best-effort delivery
+                except Exception:
+                    pass  # Best-effort delivery
 
     def add_webhook(self, url: str, events: list[str] = None, secret: str = None) -> dict:
         """Add a webhook subscription."""
