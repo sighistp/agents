@@ -1,7 +1,7 @@
 import json
 import os
 import pytest
-from devteam.agents.tool_executor import execute_tool, _validate_path
+from devteam.agents.tool_executor import execute_tool
 
 
 class MockCall:
@@ -55,18 +55,3 @@ def test_unknown_tool():
     call = MockCall("unknown_tool", {})
     result = json.loads(execute_tool(call, "/tmp"))
     assert "error" in result
-
-
-def test_validate_path_rejects_dotdot():
-    with pytest.raises(ValueError, match="不安全"):
-        _validate_path("../etc/passwd", "/tmp")
-
-
-def test_validate_path_rejects_absolute():
-    with pytest.raises(ValueError, match="不安全"):
-        _validate_path("/etc/passwd", "/tmp")
-
-
-def test_validate_path_rejects_empty():
-    with pytest.raises(ValueError, match="不安全"):
-        _validate_path("", "/tmp")

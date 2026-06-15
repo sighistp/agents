@@ -122,8 +122,8 @@ def call_llm(messages: list) -> str:
         return llm.invoke(messages).content
 
 
-# Module-level async lock for rate limiting
-_async_llm_lock = asyncio.Lock()
+# Module-level async semaphore for rate limiting (allow 5 concurrent async calls)
+_async_llm_lock = asyncio.Semaphore(5)
 
 
 async def call_llm_async(messages: list) -> str:
@@ -159,6 +159,12 @@ def call_llm_with_tools(messages: list, tools: list):
 async def call_llm_with_tools_async(messages: list, tools: list):
     """异步版本：调用 LLM 并绑定工具，返回完整 response（含 tool_calls）"""
     llm = _get_llm()
-    async with _async_llm_lock:
-        llm_with_tools = llm.bind_tools(tools)
-        return await llm_with_tools.ainvoke(messages)
+    for attempt in range(2):
+        try:
+            async with _async_llm_lock:
+                llm_with_tools = llm.bind_tools(tools)
+                return await llm_with_tools.ainvoke(messages)
+        except Exception as e:
+            if attempt == 1:
+                raise
+            await asyncio.sleep(0.5 * (2 ** attempt))

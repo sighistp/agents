@@ -12,11 +12,16 @@ from devteam.api.settings import router as settings_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown hooks."""
-    # Startup
+    # Startup: initialize memory database (already done in __init__)
+    from devteam.utils.memory import get_memory
+    mem = get_memory()
+
     yield
+
     # Shutdown: close database connections
+    mem.close()
     import gc
-    gc.collect()  # Force garbage collection to close connections
+    gc.collect()
 
 
 app = FastAPI(title="DevTeam", lifespan=lifespan)

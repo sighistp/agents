@@ -27,8 +27,12 @@ class ProjectState(TypedDict):
 
     # Architecture
     architecture: dict
+    technical_constraints: list[str]  # 技术约束（由 PM/Architect 产生）
     api_definitions: list[dict]
     data_models: list[dict]
+
+    # Decisions
+    key_decisions: list[str]  # 关键决策（由 Developer done 工具产生）
 
     # Code
     project_dir: str           # 项目工作目录
@@ -60,6 +64,8 @@ class ProjectState(TypedDict):
     _pm_retry_count: int
     _architect_retry_count: int
     _developer_retry_count: int
+    _tester_retry_count: int
+    _reviewer_retry_count: int
 
     # Messages (auto-appended with limit)
     messages: Annotated[list, add_messages_with_limit]
@@ -87,8 +93,10 @@ def create_initial_state(project_id: str, requirement: str) -> ProjectState:
         user_stories=[],
         features=[],
         architecture={},
+        technical_constraints=[],
         api_definitions=[],
         data_models=[],
+        key_decisions=[],
         files={},
         test_cases=[],
         test_results=[],
@@ -107,5 +115,7 @@ def create_initial_state(project_id: str, requirement: str) -> ProjectState:
         _pm_retry_count=0,
         _architect_retry_count=0,
         _developer_retry_count=0,
+        _tester_retry_count=0,
+        _reviewer_retry_count=0,
         messages=[]
     )

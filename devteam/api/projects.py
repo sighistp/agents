@@ -8,6 +8,9 @@ Endpoints:
 - GET    /api/projects/{project_id}/files/{file_path} - Preview a file
 - GET    /api/projects/{project_id}/download          - Download project as zip
 - GET    /api/projects/{project_id}/download/{path}   - Download a single file
+- GET    /api/projects/{project_id}/conversations     - Get conversation history
+- GET    /api/projects/{project_id}/executions        - Get execution summary
+- GET    /api/projects/{project_id}/export            - Export project as zip
 - POST   /api/resume                                  - Resume interrupt
 - POST   /api/rethink                                 - Trigger rethink
 - POST   /api/cancel                                  - Cancel project
@@ -26,24 +29,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from devteam.utils.memory import ProjectMemory
+from devteam.utils.memory import get_memory
 
 router = APIRouter(prefix="/api", tags=["projects"])
-
-# Module-level memory instance (lazy init to avoid import-time DB creation)
-import threading
-_memory: ProjectMemory | None = None
-_memory_lock = threading.Lock()
-
-
-def _get_memory() -> ProjectMemory:
-    global _memory
-    if _memory is None:
-        with _memory_lock:
-            # Double-check locking
-            if _memory is None:
-                _memory = ProjectMemory()
-    return _memory
 
 # ── Pydantic Models ─────────────────────────────────────────────────────
 
@@ -51,6 +39,7 @@ def _get_memory() -> ProjectMemory:
 class ProjectCreate(BaseModel):
     requirement: str
     project_id: Optional[str] = None
+    name: Optional[str] = None
 
 
 class CancelRequest(BaseModel):
@@ -74,12 +63,13 @@ def _projects_dir() -> Path:
     """Return the projects root directory.
 
     Honours the DEVTEAM_PROJECT_DIR env-var so tests can override it.
+    Default: {project_root}/projects (same as create_initial_state uses).
     """
     import os
 
     return Path(os.environ.get(
         "DEVTEAM_PROJECT_DIR",
-        str(Path(__file__).resolve().parent.parent / "projects"),
+        str(Path(__file__).resolve().parent.parent.parent / "projects"),
     ))
 
 
@@ -161,18 +151,39 @@ def _write_meta(project_id: str, meta: dict) -> None:
 
 @router.post("/projects")
 def create_project(req: ProjectCreate):
-    """Create a new project with its initial meta.json."""
-    project_id = req.project_id or str(uuid.uuid4())[:12]  # 12 chars for reasonable collision resistance
+    """Create or update a project (upsert behavior).
+
+    If the project already exists, updates its meta.json.
+    If not, creates a new project directory and meta.json.
+    """
+    project_id = req.project_id or str(uuid.uuid4())[:12]
     _validate_project_id(project_id)
 
     pdir = _project_dir(project_id)
-    if pdir.exists():
-        raise HTTPException(status_code=409, detail=f"Project '{project_id}' already exists")
 
+    if pdir.exists():
+        # Upsert: update existing project's meta
+        try:
+            meta = _read_meta(project_id)
+        except HTTPException:
+            meta = {}
+        meta["requirement"] = req.requirement or meta.get("requirement", "")
+        if req.name is not None:
+            meta["name"] = req.name
+        _write_meta(project_id, meta)
+        get_memory().save_project(
+            project_id=project_id,
+            requirement=meta["requirement"],
+            status=meta.get("status", "active"),
+        )
+        return {"project_id": project_id, "status": "updated"}
+
+    # Create new project
     pdir.mkdir(parents=True, exist_ok=True)
     meta = {
         "project_id": project_id,
         "requirement": req.requirement,
+        "name": req.name,
         "user_stories": [],
         "features": [],
         "architecture": {},
@@ -182,7 +193,7 @@ def create_project(req: ProjectCreate):
     _write_meta(project_id, meta)
 
     # Save to project memory
-    _get_memory().save_project(
+    get_memory().save_project(
         project_id=project_id,
         requirement=req.requirement,
         status="created",
@@ -211,6 +222,7 @@ def list_projects():
                 meta = json.loads(text)
                 results.append({
                     "project_id": meta.get("project_id", entry.name),
+                    "name": meta.get("name"),
                     "requirement": meta.get("requirement", ""),
                     "status": meta.get("status", "unknown"),
                     "iteration": meta.get("iteration", 0),
@@ -233,6 +245,62 @@ def get_project(project_id: str):
         "architecture": meta.get("architecture", {}),
         "iteration": meta.get("iteration", 0),
         "status": meta.get("status", "unknown"),
+    }
+
+
+@router.get("/projects/{project_id}/state")
+def get_project_state(project_id: str):
+    """Restore project state from SQLite memory (for page refresh recovery)."""
+    _validate_project_id(project_id)
+    mem = get_memory()
+
+    # Get snapshot
+    snapshot = mem.get_snapshot(project_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' state not found")
+
+    # Get messages (limit 200)
+    messages = mem.get_messages(project_id, limit=200)
+
+    # Get project files from disk
+    pdir = _project_dir(project_id)
+    files = {}
+    max_file_size = 1024 * 1024  # 1MB
+    max_files = 50
+    skipped_files = []
+    if pdir.exists():
+        for fpath in sorted(pdir.rglob("*")):
+            if fpath.is_file() and len(files) < max_files:
+                try:
+                    if fpath.stat().st_size > max_file_size:
+                        skipped_files.append(str(fpath.relative_to(pdir)))
+                        continue
+                    rel = str(fpath.relative_to(pdir))
+                    files[rel] = fpath.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    continue
+
+    # Get last heartbeat
+    last_heartbeat = snapshot.get("last_heartbeat")
+
+    # Get name from meta.json (may be None)
+    try:
+        meta = _read_meta(project_id)
+        name = meta.get("name")
+    except HTTPException:
+        name = None
+
+    return {
+        "project_id": project_id,
+        "name": name,
+        "requirement": snapshot.get("requirement", ""),
+        "current_step": snapshot.get("current_step", ""),
+        "iteration": snapshot.get("iteration", 0),
+        "status": snapshot.get("status", "unknown"),
+        "files": files,
+        "messages": messages,
+        "last_heartbeat": last_heartbeat,
+        "skipped_files": skipped_files,
     }
 
 
@@ -342,6 +410,101 @@ async def download_file(project_id: str, file_path: str):
     )
 
 
+# ── Conversations / Executions / Export ─────────────────────────────────
+
+
+@router.get("/projects/{project_id}/conversations")
+def get_project_conversations(project_id: str):
+    """Get full conversation history for a project."""
+    _validate_project_id(project_id)
+    mem = get_memory()
+    convs = mem.get_conversations(project_id)
+    # Parse messages JSON string to list for each conversation
+    for c in convs:
+        if isinstance(c.get("messages"), str):
+            try:
+                c["messages"] = json.loads(c["messages"])
+            except json.JSONDecodeError:
+                c["messages"] = []
+    return {"conversations": convs}
+
+
+@router.get("/projects/{project_id}/executions")
+def get_project_executions(project_id: str):
+    """Get execution summary for a project."""
+    _validate_project_id(project_id)
+    mem = get_memory()
+    execs = mem.get_executions(project_id)
+    # Parse tool_calls JSON string to list for each execution
+    for e in execs:
+        tc = e.get("tool_calls")
+        if isinstance(tc, str):
+            try:
+                e["tool_calls"] = json.loads(tc)
+            except json.JSONDecodeError:
+                e["tool_calls"] = []
+    return {"executions": execs}
+
+
+@router.get("/projects/{project_id}/export")
+def export_project(project_id: str):
+    """Export project as zip with files, meta, conversations, and executions."""
+    _validate_project_id(project_id)
+    pdir = _project_dir(project_id)
+    if not pdir.exists():
+        raise HTTPException(404, "Project not found")
+
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    buf = io.BytesIO()
+    skipped = []
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Project files (use read_bytes for binary compatibility)
+        for fpath in sorted(pdir.rglob("*")):
+            if fpath.is_file() and not fpath.is_symlink():
+                arcname = str(fpath.relative_to(pdir))
+                # Skip meta.json (added separately below)
+                if arcname == "meta.json":
+                    continue
+                if fpath.stat().st_size > MAX_FILE_SIZE:
+                    skipped.append(arcname)
+                    continue
+                zf.write(fpath, arcname)
+        # Skipped files list
+        if skipped:
+            zf.writestr("skipped_files.txt", "\n".join(skipped))
+        # Metadata
+        meta = _read_meta(project_id)
+        zf.writestr("meta.json", json.dumps(meta, ensure_ascii=False, indent=2))
+        # Conversations
+        mem = get_memory()
+        convs = mem.get_conversations(project_id)
+        for c in convs:
+            if isinstance(c.get("messages"), str):
+                c["messages"] = json.loads(c["messages"])
+        zf.writestr("conversations.json", json.dumps(convs, ensure_ascii=False, indent=2))
+        # Executions (parse tool_calls from JSON string to list)
+        execs = mem.get_executions(project_id)
+        for e in execs:
+            tc = e.get("tool_calls")
+            if isinstance(tc, str):
+                try:
+                    e["tool_calls"] = json.loads(tc)
+                except json.JSONDecodeError:
+                    e["tool_calls"] = []
+        zf.writestr("executions.json", json.dumps(execs, ensure_ascii=False, indent=2))
+
+    buf.seek(0)
+    content = buf.getvalue()
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{project_id}.zip"',
+            "Content-Length": str(len(content)),
+        },
+    )
+
+
 # ── Resume / Rethink / Cancel ───────────────────────────────────────────
 
 
@@ -372,7 +535,7 @@ def cancel_project(req: CancelRequest):
     _write_meta(req.project_id, meta)
 
     # Update status in project memory
-    _get_memory().update_status(req.project_id, "cancelled")
+    get_memory().update_status(req.project_id, "cancelled")
 
     return {"status": "cancelled", "project_id": req.project_id}
 
@@ -393,7 +556,7 @@ def delete_project(project_id: str):
 
     # Remove from memory
     try:
-        _get_memory().update_status(project_id, "deleted")
+        get_memory().update_status(project_id, "deleted")
     except Exception:
         pass
 

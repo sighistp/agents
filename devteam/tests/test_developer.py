@@ -87,21 +87,51 @@ async def test_developer_handles_no_tool_calls():
 
 @pytest.mark.asyncio
 async def test_developer_max_steps():
-    """超过最大步数应返回错误"""
+    """超过最大步数应返回错误（无文件写入时）"""
     from devteam.agents.developer import developer_agent
     from devteam.agents.state import create_initial_state
 
     state = create_initial_state("test-dev", "Build a calculator")
 
-    always_write = _make_response("", [_make_tool_call("file_write", {"path": "a.py", "content": "x=1"})])
+    # LLM 只读文件不写文件，也不调 done → 真正的 max steps
+    always_read = _make_response("", [_make_tool_call("file_read", {"path": "a.py"})])
 
-    with patch("devteam.agents.developer.call_llm_with_tools_async", new_callable=AsyncMock, return_value=always_write):
+    with patch("devteam.agents.developer.call_llm_with_tools_async", new_callable=AsyncMock, return_value=always_read):
         with patch("devteam.agents.tool_executor.execute_tool") as mock_exec:
-            mock_exec.return_value = json.dumps({"success": True, "path": "a.py"})
+            mock_exec.return_value = json.dumps({"content": "x=1"})
             result = await developer_agent(state)
 
     assert result.get("error") is not None
     assert "最大步数" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_developer_implicit_done_with_files():
+    """LLM 写了文件后下一轮无新写入，应视为隐式完成（不报错）"""
+    from devteam.agents.developer import developer_agent
+    from devteam.agents.state import create_initial_state
+
+    state = create_initial_state("test-dev", "Build a calculator")
+
+    # 第1轮：写文件；第2轮：只执行代码（无新写入）→ 隐式完成
+    write_resp = _make_response("", [_make_tool_call("file_write", {"path": "a.py", "content": "x=1"})])
+    exec_resp = _make_response("", [_make_tool_call("execute_python", {"code": "print(1)"})])
+
+    call_count = 0
+    async def mock_llm(messages, tools):
+        nonlocal call_count
+        call_count += 1
+        return write_resp if call_count == 1 else exec_resp
+
+    with patch("devteam.agents.developer.call_llm_with_tools_async", new_callable=AsyncMock, side_effect=mock_llm):
+        with patch("devteam.agents.tool_executor.execute_tool") as mock_exec:
+            mock_exec.return_value = json.dumps({"success": True, "stdout": "1\n", "returncode": 0})
+            result = await developer_agent(state)
+
+    # files_written + 隐式 done = 成功，不应有 error
+    assert result.get("error") is None
+    assert result.get("files", {}).get("a.py") == "x=1"
+    assert call_count == 2  # 只调了2轮LLM，不是10轮
 
 
 @pytest.mark.asyncio

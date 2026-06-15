@@ -1,23 +1,38 @@
 <template>
   <div class="chat-panel">
-    <div class="chat-header">
-      <span class="chat-title">通讯频道</span>
-      <div class="chat-actions">
-        <button class="btn-icon" @click="clearChat" title="清空聊天">🗑️</button>
-        <button class="btn-icon" @click="newChat" title="新建对话">✚</button>
-      </div>
-    </div>
+    <ChatHeader
+      @pause="send({ type: 'pause' })"
+      @resume="send({ type: 'resume_execution' })"
+      @stop="send({ type: 'stop' })"
+      @save="showSaveDialog"
+      @clear="clearChat"
+      @new="newChat"
+    />
+    <SaveDialog
+      v-model:visible="projectStore.saveDialogVisible"
+      :default-name="projectStore.autoSaveName"
+      :error="saveError"
+      @save="handleSave"
+    />
     <div class="messages" ref="messagesRef">
       <div v-for="(msg, i) in projectStore.messages" :key="i" :class="['message', `msg-${msg.name || msg.role}`]">
-        <div class="msg-avatar">{{ avatar(msg.name || msg.role) }}</div>
-        <div class="msg-body">
-          <div class="msg-header">
-            <span class="msg-name" :style="{ color: color(msg.name) }">{{ label(msg.name) }}</span>
-            <span class="msg-time">{{ time(msg.timestamp) }}</span>
-            <button v-if="msg.name === 'user'" class="btn-retry" @click="retryMessage(msg.content)" title="重试">🔄</button>
+        <!-- Agent 结构化输出卡片 -->
+        <AgentOutputCard
+          v-if="isAgentMessage(msg)"
+          :msg="{ ...msg, data: { data: projectStore.agentOutputs[msg.name] } }"
+        />
+        <!-- 普通消息（用户/系统/tool） -->
+        <template v-else>
+          <div class="msg-avatar">{{ avatar(msg.name || msg.role) }}</div>
+          <div class="msg-body">
+            <div class="msg-header">
+              <span class="msg-name" :style="{ color: color(msg.name) }">{{ label(msg.name) }}</span>
+              <span class="msg-time">{{ time(msg.timestamp) }}</span>
+              <button v-if="msg.name === 'user'" class="btn-retry" @click="retryMessage(msg.content)" title="重试">🔄</button>
+            </div>
+            <div class="msg-content">{{ formatMessageContent(msg) }}</div>
           </div>
-          <div class="msg-content">{{ formatMessageContent(msg) }}</div>
-        </div>
+        </template>
       </div>
     </div>
     <div class="chat-input">
@@ -28,14 +43,23 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import { useProjectStore } from '../stores/project.js'
 import { useWebSocket, setActiveProject } from '../composables/useWebSocket.js'
+import ChatHeader from './ChatHeader.vue'
+import SaveDialog from './SaveDialog.vue'
+import AgentOutputCard from './AgentOutputCard.vue'
+
+const AGENT_NAMES = ['pm', 'architect', 'developer', 'tester', 'reviewer']
+function isAgentMessage(msg) {
+  return AGENT_NAMES.includes(msg.name) && projectStore.agentOutputs[msg.name]
+}
 
 const projectStore = useProjectStore()
 const { send } = useWebSocket()
 const inputText = ref('')
 const messagesRef = ref(null)
+const saveError = ref('')
 
 const avatarMap = { pm: '👤', architect: '🏗️', developer: '💻', tester: '🧪', reviewer: '🔍', system: '🤖', user: '👤', pm_proposer: '👤', pm_critic: '🔍', arch_proposer: '🏗️', arch_critic: '🔍', developer_critic: '🔍' }
 const colorMap = { pm: '#3B82F6', architect: '#8B5CF6', developer: '#10B981', tester: '#F59E0B', reviewer: '#EC4899', system: '#6B7280', user: '#3B82F6', pm_proposer: '#3B82F6', pm_critic: '#EC4899', arch_proposer: '#8B5CF6', arch_critic: '#EC4899', developer_critic: '#EC4899' }
@@ -84,14 +108,40 @@ function formatMessageContent(msg) {
   return msg.content || ''
 }
 
+function autoGenerateName(requirement) {
+  if (!requirement) return '未命名项目'
+  const isChinese = /[一-鿿]/.test(requirement)
+  const maxLen = isChinese ? 15 : 30
+  if (requirement.length <= maxLen) return requirement
+  return requirement.slice(0, maxLen) + '...'
+}
+
 function sendMessage() {
   const text = inputText.value.trim()
   if (!text) return
   const projectId = 'proj-' + Date.now()
   setActiveProject(projectId)
+  projectStore.currentProject = { id: projectId, requirement: text }
+  projectStore.autoSaveName = autoGenerateName(text)
   projectStore.addMessage({ role: 'user', name: 'user', content: text })
   send({ type: 'start_project', requirement: text, project_id: projectId })
   inputText.value = ''
+}
+
+function showSaveDialog() {
+  projectStore.saveDialogVisible = true
+}
+
+async function handleSave(name) {
+  saveError.value = ''
+  const ok = await projectStore.saveProject(name)
+  if (ok) {
+    projectStore.saveDialogVisible = false
+    projectStore.addMessage({ role: 'system', name: 'system', content: `💾 项目已保存: ${name}` })
+  } else {
+    saveError.value = '保存失败，请重试'
+    projectStore.addMessage({ role: 'system', name: 'system', content: '❌ 保存失败' })
+  }
 }
 
 function clearChat() {
@@ -109,9 +159,21 @@ function retryMessage(content) {
   const projectId = 'proj-' + Date.now()
   setActiveProject(projectId)
   projectStore.reset()
+  projectStore.currentProject = { id: projectId, requirement: content }
   projectStore.addMessage({ role: 'user', name: 'user', content })
   send({ type: 'start_project', requirement: content, project_id: projectId })
 }
+
+onMounted(() => {
+  // Check store first, then sessionStorage as fallback
+  const req = projectStore.pendingRequirement || sessionStorage.getItem('pendingRequirement')
+  if (req) {
+    projectStore.pendingRequirement = null
+    sessionStorage.removeItem('pendingRequirement')
+    inputText.value = req
+    nextTick(() => sendMessage())
+  }
+})
 
 watch(() => projectStore.messages.length, () => {
   nextTick(() => { if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight })
@@ -120,11 +182,6 @@ watch(() => projectStore.messages.length, () => {
 
 <style scoped>
 .chat-panel { display: flex; flex-direction: column; height: 100%; }
-.chat-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-.chat-title { font-size: 14px; font-weight: 600; color: var(--text-dim); }
-.chat-actions { display: flex; gap: 6px; }
-.btn-icon { width: 28px; height: 28px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; transition: all 0.15s; }
-.btn-icon:hover { background: var(--bg-panel); border-color: var(--primary); color: var(--primary); }
 .btn-retry { background: none; border: none; cursor: pointer; font-size: 12px; opacity: 0; transition: opacity 0.15s; padding: 0 4px; }
 .message:hover .btn-retry { opacity: 0.6; }
 .btn-retry:hover { opacity: 1; }

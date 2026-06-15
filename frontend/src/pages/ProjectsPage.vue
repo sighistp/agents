@@ -4,10 +4,10 @@
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="projects.length === 0" class="empty">暂无项目</div>
     <div v-else class="projects-grid">
-      <div v-for="p in projects" :key="p.id" class="project-card" @click="$router.push(`/projects/${p.id}`)">
-        <div class="project-name">{{ p.name || p.id }}</div>
-        <div class="project-meta">{{ p.status }} · {{ new Date(p.created_at).toLocaleDateString() }}</div>
-        <button class="btn-delete" @click.stop="remove(p.id)">删除</button>
+      <div v-for="p in projects" :key="p.project_id" class="project-card" @click="$router.push(`/projects/${p.project_id}`)">
+        <div class="project-name">{{ p.name || p.requirement || p.project_id }}</div>
+        <div class="project-meta">{{ p.status || 'unknown' }} · 迭代 {{ p.iteration || 0 }} 次</div>
+        <button class="btn-delete" @click.stop="remove(p.project_id)">删除</button>
       </div>
     </div>
   </div>
@@ -28,7 +28,7 @@ onMounted(async () => {
 async function remove(id) {
   if (!confirm('确定删除？')) return
   await api.deleteProject(id)
-  projects.value = projects.value.filter(p => p.id !== id)
+  projects.value = projects.value.filter(p => p.project_id !== id)
 }
 </script>
 

@@ -25,16 +25,38 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth.js'
-import { useWebSocket } from './composables/useWebSocket.js'
+import { useProjectStore } from './stores/project.js'
+import { useWebSocket, setActiveProject } from './composables/useWebSocket.js'
 import LoadingBar from './components/LoadingBar.vue'
 import AgentStatusBar from './components/AgentStatusBar.vue'
 import InterruptDialog from './components/InterruptDialog.vue'
 
 const authStore = useAuthStore()
+const projectStore = useProjectStore()
 const router = useRouter()
 const { connect, disconnect } = useWebSocket()
 
-onMounted(() => { if (authStore.isLoggedIn) connect() })
+onMounted(async () => {
+  if (authStore.isLoggedIn) {
+    connect()
+    // 同步后端设置到前端（maxIterations 等）
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/settings', { headers: { 'Authorization': `Bearer ${token}` } })
+      if (res.ok) {
+        const settings = await res.json()
+        if (settings.max_iterations) projectStore.maxIterations = settings.max_iterations
+      }
+    } catch {}
+    // Restore active project from localStorage after page refresh
+    const activeId = localStorage.getItem('activeProjectId')
+    if (activeId) {
+      const restored = await projectStore.restoreFromServer(activeId)
+      if (restored) setActiveProject(activeId)
+      else localStorage.removeItem('activeProjectId')
+    }
+  }
+})
 onUnmounted(() => { disconnect() })
 
 function logout() {

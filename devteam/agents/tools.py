@@ -7,11 +7,11 @@ FILE_WRITE = {
     "type": "function",
     "function": {
         "name": "file_write",
-        "description": "写入文件到项目目录",
+        "description": "写入文件到项目目录。路径规则：不能含 .. 或绝对路径，不能写入 .env/settings.json/.git 等敏感文件。内容约束：不能含 import subprocess/os.system/eval/exec 等危险模式。",
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "文件路径，如 main.py"},
+                "path": {"type": "string", "description": "相对路径，如 main.py 或 static/style.css。不能含 .. 或以 / 开头"},
                 "content": {"type": "string", "description": "文件内容"}
             },
             "required": ["path", "content"]
@@ -23,11 +23,11 @@ FILE_READ = {
     "type": "function",
     "function": {
         "name": "file_read",
-        "description": "读取项目目录中的文件",
+        "description": "读取项目目录中的文件。路径规则同 file_write。",
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "文件路径"}
+                "path": {"type": "string", "description": "相对路径，如 main.py 或 static/style.css"}
             },
             "required": ["path"]
         }
@@ -38,7 +38,7 @@ EXECUTE_PYTHON = {
     "type": "function",
     "function": {
         "name": "execute_python",
-        "description": "执行 Python 代码并返回输出",
+        "description": "在沙箱中执行 Python 代码并返回输出。代码在临时目录运行，项目文件会自动复制过去。不能含 import subprocess/os.system/eval/exec 等危险模式。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -77,7 +77,42 @@ DONE = {
 
 DEVELOPER_TOOLS = [FILE_WRITE, FILE_READ, EXECUTE_PYTHON, DONE]
 TESTER_TOOLS = [FILE_READ, EXECUTE_PYTHON, DONE]
-REVIEWER_TOOLS = [FILE_READ, DONE]
+
+# Reviewer 专用 done 工具 — 包含审查字段，确保 LLM 输出结构化审查结论
+REVIEWER_DONE = {
+    "type": "function",
+    "function": {
+        "name": "done",
+        "description": "完成审查并提交结论",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string", "description": "审查总结"},
+                "review_approved": {
+                    "type": "boolean",
+                    "description": "审查是否通过（true=通过，false=不通过）"
+                },
+                "review_comments": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "file": {"type": "string", "description": "文件路径"},
+                            "line": {"type": "integer", "description": "行号"},
+                            "severity": {"type": "string", "enum": ["critical", "important", "minor"], "description": "严重程度"},
+                            "description": {"type": "string", "description": "问题描述"},
+                            "suggestion": {"type": "string", "description": "修复建议"}
+                        },
+                        "required": ["severity", "description"]
+                    },
+                    "description": "审查发现的问题列表"
+                }
+            },
+            "required": ["summary", "review_approved"]
+        }
+    }
+}
+REVIEWER_TOOLS = [FILE_READ, REVIEWER_DONE]
 
 
 def get_call_name(call: Any) -> str:

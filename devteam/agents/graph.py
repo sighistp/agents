@@ -1,9 +1,12 @@
 """LangGraph graph structure for multi-agent workflow."""
+import logging
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
 from devteam.agents.state import ProjectState
+
+logger = logging.getLogger("devteam.graph")
 
 # Import real agent nodes
 from devteam.agents.pm import pm_agent
@@ -30,21 +33,32 @@ def human_confirm_node(state: ProjectState) -> dict[str, Any]:
         logger.info(f"Human confirm: already approved={human_approved}")
         return {"human_approved": human_approved}
 
-    # Prepare architecture data for display
-    architecture = state.get("architecture", {})
-    api_definitions = state.get("api_definitions", [])
-    data_models = state.get("data_models", [])
+    # 判断是架构确认还是 Developer 重试失败后的用户决策
+    error = state.get("error", "")
+    is_dev_retry = error and "超过最大步数" in error
 
-    logger.info("Human confirm: calling interrupt() to pause for user confirmation")
-
-    # Interrupt and wait for user confirmation
-    response = interrupt({
-        "type": "confirm",
-        "message": "请确认以下架构设计",
-        "architecture": architecture,
-        "api_definitions": api_definitions,
-        "data_models": data_models
-    })
+    if is_dev_retry:
+        # Developer 重试失败，让用户决定
+        logger.info("Human confirm: Developer max retries, asking user")
+        response = interrupt({
+            "type": "confirm",
+            "message": f"Developer 已重试 2 次仍失败：{error[:200]}\n是否继续尝试？",
+            "error": error,
+            "files": list(state.get("files", {}).keys()),
+        })
+    else:
+        # 正常架构确认流程
+        architecture = state.get("architecture", {})
+        api_definitions = state.get("api_definitions", [])
+        data_models = state.get("data_models", [])
+        logger.info("Human confirm: calling interrupt() to pause for user confirmation")
+        response = interrupt({
+            "type": "confirm",
+            "message": "请确认以下架构设计",
+            "architecture": architecture,
+            "api_definitions": api_definitions,
+            "data_models": data_models
+        })
 
     logger.info(f"Human confirm: user responded with {response}")
 
@@ -55,6 +69,23 @@ def human_confirm_node(state: ProjectState) -> dict[str, Any]:
         approved = response.lower() in ("approved", "true", "yes")
     else:
         approved = bool(response)
+
+    if is_dev_retry:
+        if approved:
+            # 用户决定继续 → 重置 retry count，重新从 Developer 开始
+            return {
+                "human_approved": True,
+                "current_agent": "developer",
+                "_developer_retry_count": 0,
+                "error": None,
+            }
+        else:
+            # 用户决定停止 → 交付已有文件
+            return {
+                "human_approved": True,
+                "current_agent": "deliver",
+                "error": None,
+            }
 
     return {
         "human_approved": approved,
@@ -185,7 +216,14 @@ def route_after_architect(state: ProjectState) -> str:
 
 def route_after_human(state: ProjectState) -> str:
     """Route after human confirmation."""
-    if state.get("human_approved"):
+    approved = state.get("human_approved")
+    current_agent = state.get("current_agent", "")
+
+    # Developer 重试失败后用户选择"停止"→ 直接交付
+    if approved and current_agent == "deliver":
+        return "deliver"
+
+    if approved:
         return "approve"
     return "reject"
 
@@ -199,23 +237,42 @@ def route_after_developer(state: ProjectState) -> str:
     - END: Security error or max retries reached
     """
     error = state.get("error")
+    files = list(state.get("files", {}).keys())
+    retry_count = state.get("_developer_retry_count", 0)
+    logger.info(f"route_after_developer: error={error!r}, files={files}, retry={retry_count}")
     if error:
         if "security" in error.lower() or "path" in error.lower():
+            logger.info("route_after_developer → END (security)")
             return END
         # Check retry count to prevent infinite loops
-        retry_count = state.get("_developer_retry_count", 0)
         if retry_count >= 2:
-            return END  # Max retries reached
+            logger.info("route_after_developer → human_confirm (max retries, let user decide)")
+            return "human_confirm"  # 让用户决定是否继续
+        logger.info("route_after_developer → developer (retry)")
         return "developer"  # Retry
+    logger.info("route_after_developer → tester")
     return "tester"
 
 
 def route_after_test(state: ProjectState) -> str:
     """Route after Tester node."""
-    if state.get("test_passed", False):
+    test_passed = state.get("test_passed", False)
+    iteration = state.get("iteration", 0)
+    max_iter = state.get("max_iterations", 3)
+    tester_retry = state.get("_tester_retry_count", 0)
+    error = state.get("error")
+    logger.info(f"route_after_test: test_passed={test_passed}, iteration={iteration}/{max_iter}, tester_retry={tester_retry}, error={error!r}")
+    if test_passed:
+        logger.info("route_after_test → reviewer (pass)")
         return "pass"
-    if state.get("iteration", 0) >= state.get("max_iterations", 3):
+    # Tester 自身崩溃重试超过 2 次，跳过 Tester 直接到 Reviewer
+    if tester_retry >= 2:
+        logger.info("route_after_test → reviewer (tester max retries)")
         return "pass"
+    if iteration >= max_iter:
+        logger.info("route_after_test → reviewer (max iterations)")
+        return "pass"
+    logger.info("route_after_test → developer (fail)")
     return "fail"
 
 
@@ -228,10 +285,23 @@ def route_after_review(state: ProjectState) -> str:
     - redesign: Has architectural issues, go back to Architect
     - human_confirm: Max iterations reached, let human decide
     """
-    if state.get("review_approved", False):
+    approved = state.get("review_approved", False)
+    iteration = state.get("iteration", 0)
+    max_iter = state.get("max_iterations", 3)
+    reviewer_retry = state.get("_reviewer_retry_count", 0)
+    error = state.get("error")
+    logger.info(f"route_after_review: approved={approved}, iteration={iteration}/{max_iter}, reviewer_retry={reviewer_retry}, error={error!r}")
+    if approved:
+        logger.info("route_after_review → deliver (approved)")
         return "approve"
-    if state.get("iteration", 0) >= state.get("max_iterations", 3):
-        return "human_confirm"
+    if iteration >= max_iter:
+        logger.info("route_after_review → deliver (max iterations)")
+        # 达到最大迭代次数，直接交付（防止死循环）
+        return "approve"
+    # Reviewer 自身崩溃重试超过 2 次，直接交付
+    if reviewer_retry >= 2:
+        logger.info("route_after_review → deliver (reviewer max retries)")
+        return "approve"
 
     comments = state.get("review_comments", [])
     has_architectural_issues = any(
@@ -243,8 +313,10 @@ def route_after_review(state: ProjectState) -> str:
     )
 
     if has_architectural_issues and state["iteration"] < 2:
+        logger.info("route_after_review → architect (redesign)")
         return "redesign"  # Go back to Architect
 
+    logger.info("route_after_review → developer (reject)")
     return "reject"  # Go back to Developer for fixes
 
 
@@ -294,6 +366,7 @@ def create_graph():
     graph.add_conditional_edges("human_confirm", route_after_human, {
         "approve": "developer",
         "reject": "architect",
+        "deliver": "deliver",
     })
 
     # Developer conditional edges
@@ -314,7 +387,6 @@ def create_graph():
         "approve": "deliver",
         "reject": "developer",
         "redesign": "architect",
-        "human_confirm": "human_confirm",  # 冲突仲裁：循环上限时让人决定
     })
 
     # Deliver to END

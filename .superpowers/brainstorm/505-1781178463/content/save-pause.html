@@ -1,0 +1,63 @@
+<h2>保存命名 + 暂停/继续 交互设计</h2>
+<p class="subtitle">点击保存时弹出命名弹窗，暂停/继续按钮替换停止按钮</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">保存命名弹窗</div>
+    <div class="mockup-body" style="padding: 16px;">
+      <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 20px; display: flex; align-items: center; justify-content: center;">
+        <div style="background: #fff; border-radius: 12px; padding: 20px; width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 12px;">💾 保存项目</div>
+          <div style="font-size: 12px; color: #666; margin-bottom: 8px;">项目名称</div>
+          <input style="width: 100%; border: 2px solid #3B82F6; border-radius: 8px; padding: 8px 12px; font-size: 13px; box-sizing: border-box;" value="紫色计算器 Web 应用">
+          <div style="font-size: 10px; color: #999; margin-top: 4px;">自动生成，可修改</div>
+          <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+            <button style="background: #f5f5f5; border: none; border-radius: 6px; padding: 6px 16px; font-size: 12px; cursor: pointer;">取消</button>
+            <button style="background: #3B82F6; color: #fff; border: none; border-radius: 6px; padding: 6px 16px; font-size: 12px; cursor: pointer;">保存</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 12px; font-size: 11px; color: #666;">
+        <b>流程：</b>点击 💾 → 弹窗（自动填入需求前 20 字）→ 用户可修改 → 确认保存 → 跳转项目详情页
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">暂停/继续按钮</div>
+    <div class="mockup-body" style="padding: 16px;">
+      <div style="font-size: 12px; color: #666; margin-bottom: 12px;">聊天头部操作栏：</div>
+      <!-- 运行中状态 -->
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 11px; color: #888; margin-bottom: 6px;">⏳ 任务运行中：</div>
+        <div style="display: flex; gap: 6px; align-items: center; background: #f8f8f8; padding: 8px 12px; border-radius: 8px;">
+          <button style="background: #ff9800; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;">⏸ 暂停</button>
+          <button style="background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: #666;">💾 保存</button>
+          <button style="background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: #666;">🗑️</button>
+          <button style="background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: #666;">✚</button>
+        </div>
+      </div>
+      <!-- 暂停状态 -->
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 11px; color: #888; margin-bottom: 6px;">⏸ 已暂停：</div>
+        <div style="display: flex; gap: 6px; align-items: center; background: #fff8f0; padding: 8px 12px; border-radius: 8px; border: 1px solid #ffcc80;">
+          <button style="background: #4caf50; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;">▶ 继续</button>
+          <button style="background: #f44336; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;">⏹ 停止</button>
+          <button style="background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: #666;">💾 保存</button>
+        </div>
+      </div>
+      <!-- 空闲状态 -->
+      <div>
+        <div style="font-size: 11px; color: #888; margin-bottom: 6px;">💤 空闲（无任务）：</div>
+        <div style="display: flex; gap: 6px; align-items: center; background: #f8f8f8; padding: 8px 12px; border-radius: 8px;">
+          <button style="background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: #666;">💾 保存</button>
+          <button style="background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: #666;">🗑️</button>
+          <button style="background: transparent; border: 1px solid #ddd; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: #666;">✚</button>
+        </div>
+      </div>
+      <div style="margin-top: 12px; font-size: 11px; color: #666;">
+        <b>三种状态：</b>运行中（可暂停）、已暂停（可继续/停止）、空闲（无任务时隐藏暂停按钮）
+      </div>
+    </div>
+  </div>
+</div>

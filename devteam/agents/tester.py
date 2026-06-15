@@ -18,11 +18,21 @@ logger = get_logger("tester")
 
 TESTER_SYSTEM_PROMPT = """你是测试工程师，负责对项目代码进行测试。
 
-规则：
-- 用 file_read 读取需要测试的代码文件
-- 用 execute_python 执行测试代码（可多次执行不同测试）
-- 覆盖正常路径和边界条件
-- 测试全部完成后调用 done 工具，summary 中说明通过/失败数量
+## 测试策略
+1. 先用 file_read 读取代码，理解逻辑
+2. 设计测试用例：正常路径 + 边界条件 + 异常情况
+3. 用 execute_python 逐个执行测试
+4. 汇总结果，调用 done 提交报告
+
+## 输出规范
+测试通过时：
+done(summary="3 passed, 0 failed: 加法测试通过, 减法测试通过, 除零测试通过")
+
+测试失败时（必须给出修复建议）：
+done(summary="2 passed, 1 failed: division(1,0) 返回 None 而非抛出异常，建议在 division 中加 if b==0: raise ValueError('除数不能为零')")
+
+## 错误恢复
+如果你收到"上一次执行失败"的提示，先理解错误原因，不要重复同样的操作。
 
 你没有 file_write 权限，只能读取和执行。"""
 
@@ -51,6 +61,11 @@ def build_tester_messages(state: dict) -> list[dict]:
             for criteria in story.get("acceptance_criteria", []):
                 user_content += f"  * {criteria}\n"
 
+    # 注入上一次的错误信息
+    prev_error = state.get("error")
+    if prev_error:
+        user_content += f"\n\n⚠️ 上一次执行失败，错误：{prev_error[:500]}\n请避免重复同样的错误。"
+
     user_content += "\n请开始测试。先用 file_read 查看代码，再用 execute_python 执行测试。"
     messages.append({"role": "user", "content": user_content})
 
@@ -67,10 +82,18 @@ def _extract_test_passed(summary: str, had_execution_errors: bool) -> bool:
         return False
 
     summary_lower = summary.lower()
+
+    # 明确的通过指标（优先级高于失败指标）
+    pass_indicators = ["全部通过", "all passed", "all tests passed", "0 fail", "0 error", "0 失败", "0failed"]
+    for indicator in pass_indicators:
+        if indicator in summary_lower:
+            return True
+
     fail_indicators = ["fail", "error", "失败", "0 passed"]
     for indicator in fail_indicators:
         if indicator in summary_lower:
-            if "0 fail" in summary_lower or "0 失败" in summary_lower or "0 error" in summary_lower:
+            # 排除 "0 fail", "0失败", "0 error" 等零失败的情况
+            if "0 fail" in summary_lower or "0失败" in summary_lower or "0 失败" in summary_lower or "0 error" in summary_lower:
                 continue
             return False
     return True
@@ -89,6 +112,7 @@ async def tester_agent(state: dict) -> dict[str, Any]:
     project_dir = state.get("project_dir", ".")
 
     try:
+        logger.info(f"Tester started, files: {list(state.get('files', {}).keys())}")
         # Build initial conversation
         llm_messages = build_tester_messages(state)
 
@@ -143,10 +167,13 @@ async def tester_agent(state: dict) -> dict[str, Any]:
                     test_results = [{"summary": done_summary}]
                     messages.append({"role": "assistant", "name": "tester",
                                      "content": done_summary})
+                    logger.info(f"Tester done: test_passed={test_passed}, summary={done_summary[:80]}")
 
                     return {
                         "test_passed": test_passed,
                         "test_results": test_results,
+                        "error": None,  # 清除旧 error
+                        "_tester_retry_count": 0,
                         "messages": messages,
                     }
 
@@ -157,14 +184,19 @@ async def tester_agent(state: dict) -> dict[str, Any]:
         return {
             "test_passed": test_passed,
             "test_results": test_results,
+            "error": None,  # 清除旧 error
+            "_tester_retry_count": 0,
             "messages": messages,
         }
 
     except Exception as e:
         logger.error(f"Tester error: {type(e).__name__}: {e}")
+        logger.info(f"Tester finished with error, test_passed=False")
         return {
             "error": str(e),
             "test_passed": False,
+            "_tester_retry_count": state.get("_tester_retry_count", 0) + 1,
+            "test_results": [{"summary": f"测试异常：{str(e)[:200]}", "status": "error"}],
             "messages": messages + [{"role": "assistant", "name": "tester",
                                       "content": f"测试失败：{str(e)[:200]}"}],
         }

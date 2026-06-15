@@ -10,6 +10,7 @@ Race condition fix: use epoch counter to discard stale messages.
 """
 import asyncio
 import json
+import logging
 import re
 import threading
 import time
@@ -23,6 +24,8 @@ from langgraph.types import Command
 from devteam.agents.graph import create_graph
 from devteam.agents.state import create_initial_state
 from devteam.api.auth import decode_token
+
+logger = logging.getLogger("devteam.websocket")
 
 router = APIRouter()
 
@@ -54,6 +57,83 @@ def _check_rate_limit(user_id: str) -> bool:
     return True
 
 
+def _extract_agent_summary(node_name: str, node_output: dict) -> str:
+    """从 Agent 输出中提取结构化摘要，用于 save_execution 的 result_summary。"""
+    parts = []
+
+    if node_name == "pm":
+        stories = node_output.get("user_stories", [])
+        features = node_output.get("features", [])
+        if stories:
+            parts.append(f"{len(stories)} 个用户故事")
+        if features:
+            parts.append(f"{len(features)} 个功能特性")
+
+    elif node_name == "architect":
+        arch = node_output.get("architecture", {})
+        apis = node_output.get("api_definitions", [])
+        models = node_output.get("data_models", [])
+        if apis:
+            parts.append(f"{len(apis)} 个 API")
+        if models:
+            parts.append(f"{len(models)} 个数据模型")
+        if arch.get("description"):
+            parts.append(arch["description"][:100])
+
+    elif node_name == "developer":
+        files = node_output.get("files", {})
+        decisions = node_output.get("key_decisions", [])
+        if files:
+            parts.append(f"写入 {len(files)} 个文件: {', '.join(list(files.keys())[:5])}")
+        if decisions:
+            parts.append(f"决策: {'; '.join(decisions[:3])}")
+
+    elif node_name == "tester":
+        test_passed = node_output.get("test_passed", False)
+        results = node_output.get("test_results", [])
+        parts.append("通过" if test_passed else "未通过")
+        if results:
+            parts.append(results[0].get("summary", "")[:100])
+
+    elif node_name == "reviewer":
+        approved = node_output.get("review_approved", False)
+        comments = node_output.get("review_comments", [])
+        parts.append("通过" if approved else "不通过")
+        if comments:
+            parts.append(f"{len(comments)} 个问题")
+
+    error = node_output.get("error")
+    if error:
+        parts.append(f"错误: {error[:100]}")
+
+    return " | ".join(parts) if parts else f"{node_name} 完成"
+
+
+def _extract_chat_message(node_name: str, node_output: dict) -> str | None:
+    """从 Agent 输出中提取一条精简的用户可见消息（用于前端聊天显示）。"""
+    # 优先用 Agent 最后一条 assistant 消息
+    messages = node_output.get("messages", [])
+    for msg in reversed(messages):
+        if msg.get("name") == node_name and msg.get("role") == "assistant":
+            content = msg.get("content", "").strip()
+            if content and len(content) > 10:
+                return content[:500]
+
+    # 没有 assistant 消息，用结构化摘要
+    return _extract_agent_summary(node_name, node_output)
+
+
+async def _send_heartbeat(ws, project_id, is_paused_fn, interval=10):
+    """Send heartbeat periodically during pause to keep WebSocket alive."""
+    while is_paused_fn():
+        try:
+            await asyncio.sleep(interval)
+            if is_paused_fn():
+                await ws.send_json({"type": "heartbeat", "project_id": project_id})
+        except Exception:
+            break
+
+
 def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch):
     """Run LangGraph graph in a thread, putting messages into an async queue.
 
@@ -76,8 +156,6 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
         if loop and loop.is_running():
             _asyncio.run_coroutine_threadsafe(msg_queue.put(msg), loop)
 
-    import asyncio as _asyncio
-
     project_id = ""
     if isinstance(input_data, dict):
         project_id = input_data.get("project_id", "unknown")
@@ -86,7 +164,31 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
 
     async def _run_async():
         """Run the graph asynchronously in a new event loop."""
+        from devteam.utils.memory import get_memory
+        mem = get_memory()
+
+        # Heartbeat task: update heartbeat every 10 seconds during execution
+        async def _heartbeat_loop():
+            while not stop_event.is_set():
+                try:
+                    mem.update_heartbeat(project_id)
+                    await _asyncio.sleep(10)
+                except Exception:
+                    break
+
+        heartbeat_task = _asyncio.create_task(_heartbeat_loop())
+
         try:
+            # Save snapshot on project start
+            if isinstance(input_data, dict):
+                mem.save_snapshot(
+                    project_id,
+                    requirement=input_data.get("requirement", ""),
+                    current_step="pm",
+                    status="active"
+                )
+            logger.info(f"[{project_id}] Graph started")
+
             _put({"type": "state_sync", "project_id": project_id,
                   "data": {k: v for k, v in input_data.items() if k != "messages"} if isinstance(input_data, dict) else {}})
 
@@ -100,6 +202,8 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
                 for node_name, node_output in event.items():
                     if node_name == "__end__":
                         output = node_output if isinstance(node_output, dict) else {}
+                        mem.save_snapshot(project_id, status="delivered", current_step="done")
+                        logger.info(f"[{project_id}] Graph completed (delivered)")
                         _put({"type": "project_done", "project_id": project_id,
                               "data": {"status": output.get("status", "delivered"),
                                        "current_agent": "done",
@@ -108,9 +212,67 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
 
                     if isinstance(node_output, dict):
                         current_state.update(node_output)
+
+                        # Convert messages to dicts (handle BaseMessage objects)
+                        raw_msgs = node_output.get("messages", [])
+                        dict_msgs = [
+                            m.model_dump() if hasattr(m, 'model_dump')
+                            else (m.dict() if hasattr(m, 'dict') else m)
+                            for m in raw_msgs
+                        ]
+
+                        # Extract tool_calls from messages (nested inside AIMessage.tool_calls)
+                        all_tool_calls = []
+                        for m in dict_msgs:
+                            tc = m.get("tool_calls")
+                            if tc:
+                                all_tool_calls.extend(tc)
+                        tool_calls_json = json.dumps(all_tool_calls, ensure_ascii=False) if all_tool_calls else None
+
+                        # 提取结构化摘要（节约 token，只存有用信息）
+                        summary = _extract_agent_summary(node_name, node_output)
+                        mem.save_execution(
+                            project_id, node_name,
+                            iteration=current_state.get("iteration", 0),
+                            result_summary=summary,
+                            status="success" if not node_output.get("error") else "error",
+                            tool_calls=tool_calls_json
+                        )
+                        # 存一条精简消息到聊天记录（不是完整 LLM 对话）
+                        chat_msg = _extract_chat_message(node_name, node_output)
+                        if chat_msg:
+                            mem.save_message(
+                                project_id,
+                                role="assistant",
+                                name=node_name,
+                                content=chat_msg[:2000]
+                            )
+                        # Save full conversation to memory (filter out system messages)
+                        filtered = [m for m in dict_msgs if m.get("role") in ("assistant", "tool")]
+                        if filtered:
+                            mem.save_conversation(project_id, node_name, current_state.get("iteration", 0), filtered)
+                        # Update snapshot step
+                        mem.save_snapshot(project_id, current_step=node_name, iteration=current_state.get("iteration", 0))
+                        mem.update_heartbeat(project_id)
+
+                        logger.info(f"[{project_id}] Agent {node_name} done (iter={current_state.get('iteration', 0)})")
+                        # 过滤消息：只发带 agent name 的消息，不发 system prompt 等内部消息
+                        # 用 dict_msgs（已转换）而非 raw BaseMessage 对象
+                        filtered_output = {k: v for k, v in node_output.items() if k != "messages"}
+                        filtered_output["messages"] = [
+                            m for m in dict_msgs
+                            if m.get("name") == node_name or m.get("role") == "tool"
+                        ]
                         _put({"type": "agent_start", "project_id": project_id, "agent": node_name})
-                        _put({"type": "agent_update", "project_id": project_id, "agent": node_name, "data": node_output})
+                        _put({"type": "agent_update", "project_id": project_id, "agent": node_name, "data": filtered_output})
                         _put({"type": "agent_done", "project_id": project_id, "agent": node_name})
+
+                # Node boundary: check if execution should pause
+                if stop_event.is_set():
+                    _put({"type": "paused", "project_id": project_id})
+                    # Wait until stop_event is cleared (user resumes)
+                    while stop_event.is_set():
+                        await _asyncio.sleep(0.5)
 
             # Check if graph paused (interrupt) or completed
             final_status = current_state.get("status", "delivered")
@@ -134,10 +296,7 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
             pass  # Task was cancelled
         except Exception as exc:
             if not stop_event.is_set():
-                # Log the exception for debugging
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Graph execution error: {type(exc).__name__}: {exc}")
+                logger.error(f"[{project_id}] Graph execution error: {type(exc).__name__}: {exc}")
 
                 # Check if this is a LangGraph interrupt
                 if "GraphInterrupt" in type(exc).__name__ or "interrupt" in str(exc).lower():
@@ -153,8 +312,15 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
                     _put({"type": "interrupt", "project_id": project_id,
                           "data": interrupt_data})
                 else:
+                    # Update snapshot status on error
+                    try:
+                        mem.save_snapshot(project_id, status="error")
+                    except Exception:
+                        pass
                     _put({"type": "error", "project_id": project_id,
                           "message": str(exc), "data": {"error": str(exc)}})
+        finally:
+            heartbeat_task.cancel()
 
     # Run async code in a new event loop (since we're in a thread)
     try:
@@ -187,6 +353,7 @@ async def ws_project(websocket: WebSocket):
     user_id = payload.get("sub", "anonymous")
 
     await websocket.accept()
+    logger.info(f"WebSocket connected: user={user_id}")
 
     graph_app = None
     current_state = None
@@ -200,6 +367,8 @@ async def ws_project(websocket: WebSocket):
     epoch = 0
     graph_thread = None
     drainer_task = None
+    paused = False
+    heartbeat_task = None
 
     async def _drain_queue():
         """Continuously drain queue and send to WebSocket."""
@@ -264,8 +433,10 @@ async def ws_project(websocket: WebSocket):
         try:
             raw = await websocket.receive_text()
         except WebSocketDisconnect:
+            logger.info(f"WebSocket disconnected: user={user_id}")
             break
         except Exception:
+            logger.info(f"WebSocket error/disconnect: user={user_id}")
             break
 
         try:
@@ -297,6 +468,7 @@ async def ws_project(websocket: WebSocket):
             cancelled = False
             # Pass config with thread_id for checkpointer
             config = {"configurable": {"thread_id": project_id}}
+            logger.info(f"[{project_id}] Starting project: {requirement[:80]}...")
             _start_graph(current_state, config)
 
         elif msg_type == "resume":
@@ -336,6 +508,33 @@ async def ws_project(websocket: WebSocket):
             await websocket.send_json({
                 "type": "project_done", "project_id": project_id,
                 "data": {"status": "cancelled", "current_agent": "done"},
+            })
+
+        elif msg_type == "pause":
+            stop_event.set()
+            paused = True
+            await websocket.send_json({"type": "paused", "project_id": project_id})
+            heartbeat_task = asyncio.create_task(_send_heartbeat(websocket, project_id, lambda: paused))
+
+        elif msg_type == "resume_execution":
+            stop_event.clear()
+            paused = False
+            # 取消心跳任务
+            if heartbeat_task and not heartbeat_task.done():
+                heartbeat_task.cancel()
+            await websocket.send_json({"type": "resumed", "project_id": project_id})
+
+        elif msg_type == "stop":
+            stop_event.set()
+            paused = False
+            cancelled = True
+            if heartbeat_task and not heartbeat_task.done():
+                heartbeat_task.cancel()
+            if drainer_task and not drainer_task.done():
+                drainer_task.cancel()
+            await websocket.send_json({
+                "type": "stopped", "project_id": project_id,
+                "data": {"status": "stopped", "current_agent": "done"}
             })
 
         elif msg_type == "reconnect":

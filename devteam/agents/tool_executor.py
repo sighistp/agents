@@ -1,6 +1,7 @@
 """工具执行引擎"""
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from devteam.agents.tools import get_call_name, get_call_args
@@ -78,60 +79,74 @@ def _file_read(args, project_dir):
 
 
 def _execute_python(args, project_dir):
-    """Execute Python code in an isolated temp directory.
+    """Execute Python code with project files available.
 
-    Does NOT use project_dir as cwd to prevent access to .env and other sensitive files.
-    The code runs in a fresh temp directory with a safe environment.
+    Copies project files to temp directory so imports work,
+    but blocks access to sensitive files like .env.
     """
+    import shutil
     code = args["code"]
-    # C6: Check for dangerous patterns before execution
     _check_code_safety(code)
     from devteam.sandbox.executor import execute_python as sandbox_exec
     timeout = min(args.get("timeout", 15), 30)
-    result = sandbox_exec(code, timeout=timeout, cwd=None)
-    return json.dumps(result)
+
+    # Create a working directory with project files (excluding sensitive ones)
+    with tempfile.TemporaryDirectory() as workdir:
+        if project_dir and os.path.isdir(project_dir):
+            sensitive_names = {'.env', '.env.local', '.devteam_secret', 'settings.json', '.git',
+                               'node_modules', '__pycache__', 'venv', '.venv', '.superpowers'}
+            for item in os.listdir(project_dir):
+                if item in sensitive_names or item.startswith('.'):
+                    continue
+                src = os.path.join(project_dir, item)
+                dst = os.path.join(workdir, item)
+                try:
+                    if os.path.isfile(src):
+                        shutil.copy2(src, dst)
+                    elif os.path.isdir(src):
+                        shutil.copytree(src, dst, dirs_exist_ok=True)
+                except (OSError, shutil.Error):
+                    pass
+
+        result = sandbox_exec(code, timeout=timeout, cwd=workdir)
+        return json.dumps(result)
+
+
+# 统一的危险模式列表
+_DANGEROUS_PATTERNS = [
+    'import socket',
+    'import urllib',
+    'import requests',
+    'import httpx',
+    'import subprocess',
+    'os.system(',
+    'os.popen(',
+    'eval(',
+    'exec(',
+    '__import__(',
+    'shutil.rmtree',
+    'os.unlink',
+    'Path.unlink',
+]
 
 
 def _check_content_safety(content: str, filename: str):
-    """C6: Block obviously malicious file content."""
-    # Only check Python files for dangerous imports
-    if not filename.endswith('.py'):
-        return
-    dangerous_patterns = [
-        'import socket',
-        'import urllib',
-        'import requests',
-        'import httpx',
-        'import subprocess',
-        'os.system(',
-        'os.popen(',
-        'eval(',
-        'exec(',
-        '__import__(',
-    ]
-    for pattern in dangerous_patterns:
-        if pattern in content:
-            raise ValueError(f"文件内容包含不允许的模式: {pattern}")
+    """C6: Block obviously malicious file content.
+
+    Only checks Python files for dangerous imports/calls.
+    HTML files are NOT checked — they need <script> tags to work.
+    XSS risk is mitigated by DOMPurify in the frontend's OutputPanel.
+    """
+    if filename.endswith('.py'):
+        for pattern in _DANGEROUS_PATTERNS:
+            if pattern in content:
+                raise ValueError(f"文件内容包含不允许的模式: {pattern}")
 
 
 def _check_code_safety(code: str):
     """C6: Block obviously dangerous code patterns."""
-    dangerous = [
-        'import socket',
-        'import urllib',
-        'import httpx',
-        'os.system(',
-        'os.popen(',
-        '__import__(',
-    ]
-    for pattern in dangerous:
+    for pattern in _DANGEROUS_PATTERNS:
         if pattern in code:
             raise ValueError(f"代码包含不允许的模式: {pattern}")
 
 
-def _validate_path(path, project_dir):
-    if not path or ".." in path or path.startswith(("/", "\\")):
-        raise ValueError(f"不安全的文件路径: {path}")
-    real = os.path.realpath(os.path.join(project_dir, path))
-    if not real.startswith(os.path.realpath(project_dir)):
-        raise ValueError(f"路径逃逸: {path}")

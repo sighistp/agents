@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import AgentCard from '../../components/AgentCard.vue'
 
 describe('AgentCard', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
   it('显示 Agent 名称和状态', () => {
     const wrapper = mount(AgentCard, { props: { name: 'pm', status: 'waiting' } })
     expect(wrapper.text()).toContain('PM')

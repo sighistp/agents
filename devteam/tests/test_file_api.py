@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from devteam.api.projects import router
+from devteam.utils.memory import ProjectMemory
 
 
 @pytest.fixture()
@@ -21,7 +22,19 @@ def tmp_projects(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def client(tmp_projects):
+def memory(tmp_path, monkeypatch):
+    """Provide a temporary memory database for testing."""
+    db_path = str(tmp_path / "test_memory.db")
+    mem = ProjectMemory(db_path)
+    import devteam.utils.memory as mem_mod
+    mem_mod._memory = mem
+    yield mem
+    mem.close()
+    mem_mod._memory = None
+
+
+@pytest.fixture()
+def client(tmp_projects, memory):
     """Create a TestClient with the projects router."""
     app = FastAPI()
     app.include_router(router)
@@ -82,13 +95,15 @@ def test_create_project_invalid_id(client):
 
 
 def test_create_project_duplicate(client, tmp_projects):
-    """POST /api/projects with existing project_id should return 409."""
+    """POST /api/projects with existing project_id should upsert (return 200)."""
     _create_project(tmp_projects, "dup-proj")
     resp = client.post(
         "/api/projects",
-        json={"requirement": "Dup", "project_id": "dup-proj"},
+        json={"requirement": "Updated requirement", "project_id": "dup-proj"},
     )
-    assert resp.status_code == 409
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "updated"
 
 
 # ── List Projects ────────────────────────────────────────────────────────
@@ -347,3 +362,39 @@ def test_invalid_project_id_in_get(client):
     """GET with invalid project_id should return 400."""
     resp = client.get("/api/projects/bad%20space")
     assert resp.status_code == 400
+
+
+# ── Conversations / Executions / Export ─────────────────────────────────
+
+
+def test_get_conversations(client, tmp_projects):
+    """GET /api/projects/{id}/conversations returns conversation history."""
+    _create_project(tmp_projects, "conv-proj")
+    resp = client.get("/api/projects/conv-proj/conversations")
+    assert resp.status_code == 200
+    assert "conversations" in resp.json()
+
+
+def test_get_executions(client, tmp_projects):
+    """GET /api/projects/{id}/executions returns execution summary."""
+    _create_project(tmp_projects, "exec-proj")
+    resp = client.get("/api/projects/exec-proj/executions")
+    assert resp.status_code == 200
+    assert "executions" in resp.json()
+
+
+def test_export_project(client, tmp_projects):
+    """GET /api/projects/{id}/export returns a zip file."""
+    _create_project(tmp_projects, "export-proj")
+    resp = client.get("/api/projects/export-proj/export")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/zip"
+
+
+def test_get_state_returns_name(client, tmp_projects, memory):
+    """GET /api/projects/{id}/state returns name field."""
+    _create_project(tmp_projects, "name-proj")
+    memory.save_snapshot("name-proj", requirement="Build an app", status="created")
+    resp = client.get("/api/projects/name-proj/state")
+    assert resp.status_code == 200
+    assert "name" in resp.json()

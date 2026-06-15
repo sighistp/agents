@@ -3,8 +3,7 @@
     <div class="output-title">生成文件</div>
     <div v-for="(content, path) in projectStore.files" :key="path" class="file-item">
       <span class="file-icon">{{ getFileIcon(path) }}</span>
-      <span class="file-name">{{ path }}</span>
-      <button class="btn-sm" @click="preview(path, content)">预览</button>
+      <span class="file-name clickable" @click="togglePreview(path, content)">{{ path }}</span>
       <button class="btn-sm" @click="downloadSingle(path, content)">下载</button>
     </div>
 
@@ -22,12 +21,18 @@
     </div>
 
     <!-- 预览窗口 -->
-    <div v-if="previewContent" class="preview-box">
+    <div v-if="previewFile" class="preview-box">
       <div class="preview-header">
-        <span>{{ previewPath }}</span>
-        <button @click="previewContent = null">✕</button>
+        <span class="preview-filename">{{ previewFile }}</span>
+        <div class="preview-actions">
+          <button class="btn-icon" @click="copyContent" title="复制">📋</button>
+          <button class="btn-icon" @click="closePreview" title="关闭">✕</button>
+        </div>
       </div>
-      <pre>{{ previewContent }}</pre>
+      <div v-if="previewContent" class="preview-code">
+        <pre><code v-html="highlightedContent"></code></pre>
+      </div>
+      <div v-else class="preview-empty">文件内容为空</div>
     </div>
   </div>
 </template>
@@ -37,11 +42,12 @@ import { ref } from 'vue'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 import { useProjectStore } from '../stores/project.js'
+import { useFilePreview } from '../composables/useFilePreview.js'
 
 const projectStore = useProjectStore()
-const previewPath = ref(null)
-const previewContent = ref(null)
 const downloading = ref(false)
+
+const { previewFile, previewContent, highlightedContent, openPreview, closePreview, copyContent } = useFilePreview()
 
 // 源码文件扩展名
 const SOURCE_EXTS = ['.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.vue', '.json', '.yaml', '.yml', '.toml']
@@ -66,9 +72,12 @@ function isAppFile(path) {
   return APP_FILES.some(name => path.endsWith(name)) || isSourceFile(path)
 }
 
-function preview(path, content) {
-  previewPath.value = path
-  previewContent.value = content
+function togglePreview(path, content) {
+  if (previewFile.value === path) {
+    closePreview()
+  } else {
+    openPreview(path, content)
+  }
 }
 
 function downloadSingle(path, content) {
@@ -125,6 +134,8 @@ function downloadAll() {
 .file-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
 .file-icon { font-size: 14px; }
 .file-name { flex: 1; font-family: monospace; }
+.file-name.clickable { cursor: pointer; color: var(--primary); }
+.file-name.clickable:hover { text-decoration: underline; }
 .btn-sm { font-size: 11px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; }
 .btn-sm:hover { border-color: var(--primary); color: var(--primary); }
 .download-options { display: flex; gap: 8px; margin-top: 16px; }
@@ -135,6 +146,12 @@ function downloadAll() {
 .btn-download-primary:hover { background: var(--primary); color: #fff; }
 .preview-box { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .preview-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-panel); font-size: 13px; font-weight: 500; }
-.preview-header button { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--text-dim); }
-.preview-box pre { padding: 16px; font-size: 13px; line-height: 1.6; overflow: auto; max-height: 400px; background: var(--bg); margin: 0; }
+.preview-filename { font-family: monospace; }
+.preview-actions { display: flex; gap: 4px; }
+.preview-header .btn-icon { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--text-dim); padding: 2px 4px; border-radius: 4px; }
+.preview-header .btn-icon:hover { color: var(--primary); background: var(--bg); }
+.preview-code { max-height: 400px; overflow: auto; background: var(--bg); }
+.preview-code pre { padding: 16px; margin: 0; font-size: 13px; line-height: 1.6; }
+.preview-code code { font-family: monospace; }
+.preview-empty { padding: 24px; text-align: center; color: var(--text-dim); font-size: 13px; }
 </style>

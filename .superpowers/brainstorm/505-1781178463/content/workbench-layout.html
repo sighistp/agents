@@ -1,0 +1,123 @@
+<h2>通讯页面布局改进方向</h2>
+<p class="subtitle">当前布局 vs 改进后的布局对比</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">当前布局</div>
+    <div class="mockup-body" style="padding: 12px; font-size: 13px;">
+      <div style="display: flex; gap: 8px; height: 320px;">
+        <!-- 左侧 FlowPanel -->
+        <div style="width: 160px; border-right: 1px solid #ddd; padding-right: 8px;">
+          <div style="font-weight: 600; font-size: 11px; color: #888; margin-bottom: 8px;">AGENT 协作流程</div>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 11px;">👤 PM · done</div>
+            <div style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 11px;">🏗️ 架构师 · done</div>
+            <div style="background: #fff3e0; padding: 4px 8px; border-radius: 4px; font-size: 11px;">💻 开发者 · running</div>
+            <div style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; font-size: 11px;">🧪 测试员 · waiting</div>
+            <div style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; font-size: 11px;">🔍 审查员 · waiting</div>
+          </div>
+          <div style="margin-top: 12px; font-size: 11px; color: #888;">迭代 2 / 3</div>
+          <div style="background: #e0e0e0; height: 3px; border-radius: 2px; margin-top: 4px;"><div style="background: #4caf50; height: 100%; width: 66%; border-radius: 2px;"></div></div>
+          <div style="margin-top: 12px; font-size: 11px; color: #888;">文件</div>
+          <div style="font-size: 10px; color: #666; margin-top: 4px;">main.py, index.html ...</div>
+        </div>
+        <!-- 右侧 ChatPanel -->
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <div style="flex: 1; overflow-y: auto; font-size: 11px; line-height: 1.6;">
+            <div style="margin-bottom: 6px;"><b style="color: #3B82F6;">👤 用户</b> 做一个计算器</div>
+            <div style="margin-bottom: 6px;"><b style="color: #3B82F6;">👤 PM</b> 已拆分为 3 个用户故事</div>
+            <div style="margin-bottom: 6px;"><b style="color: #8B5CF6;">🏗️ 架构师</b> 架构设计完成，定义了 2 个 API</div>
+            <div style="margin-bottom: 6px;"><b style="color: #10B981;">💻 开发者</b> 📝 写入 main.py</div>
+            <div style="margin-bottom: 6px;"><b style="color: #10B981;">💻 开发者</b> 📝 写入 index.html</div>
+            <div style="margin-bottom: 6px;"><b style="color: #10B981;">💻 开发者</b> 📝 写入 style.css</div>
+            <div style="margin-bottom: 6px;"><b style="color: #10B981;">💻 开发者</b> ▶️ 执行代码</div>
+            <div style="margin-bottom: 6px;"><b style="color: #10B981;">💻 开发者</b> ✅ 完成</div>
+            <div style="margin-bottom: 6px;"><b style="color: #F59E0B;">🧪 测试员</b> 所有测试通过</div>
+            <div style="margin-bottom: 6px;"><b style="color: #EC4899;">🔍 审查员</b> 审查通过</div>
+            <div style="margin-bottom: 6px;"><b style="color: #6B7280;">🤖 系统</b> 项目完成！</div>
+          </div>
+          <div style="border-top: 1px solid #ddd; padding-top: 6px; display: flex; gap: 4px;">
+            <input style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px; font-size: 11px;" placeholder="描述你的需求..." disabled>
+            <button style="background: #3B82F6; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px;">▶</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 8px; font-size: 10px; color: #999; text-align: center;">
+        ⚠️ 问题：所有 Agent 输出混在纯文本聊天中，无法快速区分文件/测试/审查
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">改进后布局</div>
+    <div class="mockup-body" style="padding: 12px; font-size: 13px;">
+      <div style="display: flex; gap: 8px; height: 320px;">
+        <!-- 左侧 FlowPanel（可交互） -->
+        <div style="width: 180px; border-right: 1px solid #ddd; padding-right: 8px;">
+          <div style="font-weight: 600; font-size: 11px; color: #888; margin-bottom: 8px;">PIPELINE</div>
+          <!-- 带进度的 Agent 卡片 -->
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <div style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; border-left: 3px solid #4caf50;">✅ PM <span style="float:right; font-size:9px; color:#888;">10s</span></div>
+            <div style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; border-left: 3px solid #4caf50;">✅ 架构师 <span style="float:right; font-size:9px; color:#888;">12s</span></div>
+            <div style="background: #fff3e0; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; border-left: 3px solid #ff9800; animation: pulse 1.5s infinite;">⏳ 开发者 <span style="float:right; font-size:9px; color:#888;">45s</span></div>
+            <div style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; border-left: 3px solid #e0e0e0;">⏸ 测试员</div>
+            <div style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; border-left: 3px solid #e0e0e0;">⏸ 审查员</div>
+          </div>
+          <!-- 迭代进度 -->
+          <div style="margin-top: 10px;">
+            <div style="font-size: 10px; color: #888; margin-bottom: 4px;">迭代 2 / 3</div>
+            <div style="background: #e0e0e0; height: 6px; border-radius: 3px;"><div style="background: #ff9800; height: 100%; width: 66%; border-radius: 3px; transition: width 0.3s;"></div></div>
+          </div>
+          <!-- 生成的文件（可预览） -->
+          <div style="margin-top: 10px;">
+            <div style="font-size: 10px; color: #888; margin-bottom: 4px;">生成文件 (3)</div>
+            <div style="font-size: 10px; cursor: pointer; color: #1976d2;">📄 main.py</div>
+            <div style="font-size: 10px; cursor: pointer; color: #1976d2;">📄 index.html</div>
+            <div style="font-size: 10px; cursor: pointer; color: #1976d2;">📄 style.css</div>
+          </div>
+        </div>
+        <!-- 右侧 ChatPanel（结构化输出） -->
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <div style="flex: 1; overflow-y: auto; font-size: 11px; line-height: 1.5;">
+            <div style="margin-bottom: 6px;"><b style="color: #3B82F6;">👤 用户</b> 做一个计算器</div>
+            <!-- PM 输出：折叠卡片 -->
+            <div style="background: #f0f7ff; border: 1px solid #d0e3f7; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px;">
+              <div style="font-weight: 600; color: #3B82F6; font-size: 11px;">👤 PM · 10s</div>
+              <div style="font-size: 10px; color: #555; margin-top: 2px;">3 个用户故事 · 2 个功能特性</div>
+            </div>
+            <!-- Developer 输出：文件列表卡片 -->
+            <div style="background: #f0faf0; border: 1px solid #d0ead0; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px;">
+              <div style="font-weight: 600; color: #10B981; font-size: 11px;">💻 开发者 · 45s · 3 个文件</div>
+              <div style="font-size: 10px; color: #555; margin-top: 2px;">
+                📝 main.py · 📝 index.html · 📝 style.css
+              </div>
+              <div style="font-size: 10px; color: #888; margin-top: 2px;">▶️ 执行通过</div>
+            </div>
+            <!-- Tester 输出：测试结果卡片 -->
+            <div style="background: #fff8f0; border: 1px solid #f0e0d0; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px;">
+              <div style="font-weight: 600; color: #F59E0B; font-size: 11px;">🧪 测试员 · 30s</div>
+              <div style="font-size: 10px; color: #555; margin-top: 2px;">✅ 3 passed · ❌ 0 failed</div>
+            </div>
+            <!-- Reviewer 输出：审查卡片 -->
+            <div style="background: #fdf0f7; border: 1px solid #f0d0e0; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px;">
+              <div style="font-weight: 600; color: #EC4899; font-size: 11px;">🔍 审查员 · 25s · 通过</div>
+              <div style="font-size: 10px; color: #555; margin-top: 2px;">无关键问题</div>
+            </div>
+            <div style="margin-bottom: 6px;"><b style="color: #6B7280;">🤖 系统</b> 项目完成！</div>
+          </div>
+          <div style="border-top: 1px solid #ddd; padding-top: 6px; display: flex; gap: 4px;">
+            <input style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px; font-size: 11px;" placeholder="描述你的需求..." disabled>
+            <button style="background: #3B82F6; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px;">▶</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 8px; font-size: 10px; color: #4caf50; text-align: center;">
+        ✅ Agent 输出用卡片分组，左侧可交互，文件可预览，进度更清晰
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+</style>

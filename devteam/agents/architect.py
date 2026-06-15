@@ -11,23 +11,21 @@ from devteam.utils.llm import call_llm_async
 
 # ── Prompts ──────────────────────────────────────────────────────────────────
 
-ARCHITECT_SYSTEM_PROMPT = """你是系统架构师，擅长技术选型和架构设计。按以下原则工作：
+ARCHITECT_SYSTEM_PROMPT = """你是系统架构师，擅长技术选型和架构设计。
 
-【约束识别】
-- 先识别技术约束：语言、框架、部署环境、性能要求
-- 不要过度设计，MVP阶段够用就行
+## 推理策略（按顺序执行）
+1. 【约束识别】先识别技术约束：语言、框架、部署环境、性能要求
+2. 【方案设计】提出最合理的架构方案，说明为什么选这个
+3. 【模块划分】将系统拆分为独立模块，每个模块职责单一
+4. 【接口设计】API 定义必须完整：method/path/request/response
+5. 【自审】接口是否清晰？有没有遗漏的边界情况？
 
-【方案设计】
-- 提出最合理的架构方案，说明为什么选这个
-- API定义必须完整：method/path/request/response
-- 数据模型必须明确字段类型
+## 常见错误（避免）
+❌ 过度设计（如为简单计算器设计微服务架构）
+❌ API 只写了 path 没写 request/response
 
-【输出阶段】
-- 严格按照JSON schema输出，不要添加其他文字
-
-【自审阶段】
-- 接口是否清晰？扩展性如何？
-- 有没有遗漏的边界情况？
+## 输出要求
+- 严格按照 JSON schema 输出，不要添加其他文字
 
 请用以下JSON格式输出：
 {
@@ -40,7 +38,10 @@ ARCHITECT_SYSTEM_PROMPT = """你是系统架构师，擅长技术选型和架构
     "data_models": [
         {"name": "ModelName", "fields": {"field1": "type1", "field2": "type2"}, "relationships": []}
     ]
-}"""
+}
+
+## 错误恢复
+如果你收到"上一次执行失败"的提示，先理解错误原因，不要重复同样的操作。"""
 
 ARCHITECT_CRITIC_PROMPT = """你是架构审查专家。从以下角度审查架构设计：
 
@@ -100,6 +101,11 @@ def build_architect_prompt(state: dict) -> list[dict]:
     if user_feedback:
         user_content += f"\n用户反馈：{user_feedback}\n请根据反馈改进架构设计。"
 
+    # 注入上一次的错误信息（重试时 LLM 能看到错在哪）
+    prev_error = state.get("error")
+    if prev_error:
+        user_content += f"\n\n⚠️ 上一次执行失败，错误：{prev_error[:500]}\n请避免重复同样的错误。"
+
     messages.append({"role": "user", "content": user_content})
 
     return messages
@@ -119,8 +125,18 @@ async def architect_agent(state: dict) -> dict[str, Any]:
         State update dict with architecture, api_definitions, data_models
     """
     from devteam.agents.discussion import get_discussion_config, proposer_critic_discuss
+    from devteam.utils.guard import check_injection
 
     messages = list(state.get("messages", []))
+
+    # 注入检测：检查用户反馈是否包含恶意内容
+    user_feedback = state.get("user_feedback", "")
+    if user_feedback and check_injection(user_feedback):
+        return {
+            "error": "用户反馈包含可疑内容",
+            "messages": messages + [{"role": "assistant", "name": "architect",
+                                      "content": "检测到可疑输入，已拒绝处理。"}],
+        }
     discussion_config = get_discussion_config().get("architect", {})
 
     try:
@@ -166,6 +182,7 @@ async def architect_agent(state: dict) -> dict[str, Any]:
             "api_definitions": [api.model_dump() for api in output.api_definitions],
             "data_models": [model.model_dump() for model in output.data_models],
             "current_agent": "developer",
+            "error": None,  # 清除旧 error
             "messages": messages + [{"role": "assistant", "name": "architect",
                                       "content": f"架构设计完成，定义了 {len(output.api_definitions)} 个API和 {len(output.data_models)} 个数据模型"}],
         }

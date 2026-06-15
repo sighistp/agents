@@ -29,7 +29,11 @@ export const api = {
   updateSettings: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   getProjects: () => request('/projects'),
   getProject: (id) => request(`/projects/${id}`),
+  getProjectState: (id) => request(`/projects/${id}/state`),
   deleteProject: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
   getProjectFiles: (id) => request(`/projects/${id}/files`),
   downloadProject: (id) => `/api/projects/${id}/download`,
+  getProjectConversations: (id) => request(`/projects/${id}/conversations`),
+  getProjectExecutions: (id) => request(`/projects/${id}/executions`),
+  exportProject: (id) => `/api/projects/${id}/export`,
 }

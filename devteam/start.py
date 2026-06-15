@@ -42,58 +42,31 @@ if static_dir.exists():
 
 # ── 路由 ─────────────────────────────────────────────────────────────
 
+_index_path = static_dir / "index.html"
+
+
 @app.get("/")
 async def root():
-    """返回主页"""
-    index_path = static_dir / "index.html"
-    if index_path.exists():
-        return FileResponse(str(index_path))
+    """返回 SPA 首页"""
+    if _index_path.exists():
+        return FileResponse(str(_index_path))
     return {"message": "DevTeam API is running. Static files not found."}
 
 
-@app.get("/index.html")
-async def index_html():
-    """返回主页（兼容直接访问index.html）"""
-    index_path = static_dir / "index.html"
-    if index_path.exists():
-        return FileResponse(str(index_path))
-    return {"message": "DevTeam API is running. Static files not found."}
+# ── SPA Catch-all ─────────────────────────────────────────────────────
+# Vue Router 使用 clean URL（/login、/projects、/settings 等），
+# 浏览器直接访问或刷新时需要服务器返回 index.html 让前端路由处理。
+# 此路由必须在所有 API 路由之后注册（API 在 main.py 中已注册）。
 
-
-@app.get("/login.html")
-async def login_html():
-    """返回登录页"""
-    login_path = static_dir / "login.html"
-    if login_path.exists():
-        return FileResponse(str(login_path))
-    return {"message": "Login page not found."}
-
-
-@app.get("/projects.html")
-async def projects_html():
-    """返回项目列表页"""
-    path = static_dir / "projects.html"
-    if path.exists():
-        return FileResponse(str(path))
-    return {"message": "Projects page not found."}
-
-
-@app.get("/project-detail.html")
-async def project_detail_html():
-    """返回项目详情页"""
-    path = static_dir / "project-detail.html"
-    if path.exists():
-        return FileResponse(str(path))
-    return {"message": "Project detail page not found."}
-
-
-@app.get("/settings.html")
-async def settings_html():
-    """返回设置页"""
-    path = static_dir / "settings.html"
-    if path.exists():
-        return FileResponse(str(path))
-    return {"message": "Settings page not found."}
+@app.get("/{path:path}")
+async def spa_catch_all(path: str):
+    """所有非 API/非静态路径返回 index.html，由 Vue Router 处理路由。"""
+    # 跳过 API 和静态文件路径（由其他路由处理）
+    if path.startswith("api/") or path.startswith("assets/") or path.startswith("static/"):
+        return {"detail": "Not Found"}
+    if _index_path.exists():
+        return FileResponse(str(_index_path))
+    return {"message": "SPA not found"}
 
 
 # ── 启动 ─────────────────────────────────────────────────────────────

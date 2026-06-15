@@ -541,6 +541,9 @@ python -m devteam.start
 | 49 | 全流程跑通修复（16项） | ✅ | 306 |
 | 50 | LLM选型 + API预设 | ✅ | 306 |
 | 51 | 文件下载分级（源码/应用/打包） | ✅ | 306 |
+| 52 | C4/C6安全修复 + I7/I9异步改造 | ✅ | 260 |
+| 53 | 运行时问题修复（4 Bug） | ✅ | 310 |
+| 54 | SQLite记忆层审查修复+Developer记忆接入 | ✅ | 323 |
 | 38 | JWT Secret问题分析 | ✅ | — |
 | 39 | WebSocket认证修复确认 | ✅ | — |
 | 40 | Developer Agent核心改造 | ✅ | 43 |
@@ -2119,3 +2122,1154 @@ async function createZip(filterFn, zipName) {
 | I9 | Developer/Tester/Reviewer 是同步函数 | 架构层面，改风险大 |
 
 **测试结果：** 256 个后端测试全过
+
+---
+
+## Phase 46：C4/C6 安全修复 + I7/I9 异步改造（2026-06-09）
+
+### C4：敏感文件保护
+
+**修复：** `_resolve_safe_path` 扩展敏感文件列表 + 目录黑名单
+
+```python
+blocked_names = {'.env', 'settings.json', 'api_presets.json', '.devteam_secret', 'config.py', ...}
+blocked_dirs = {'data', '.git', '.claude', 'node_modules', '__pycache__}
+```
+
+### C6：注入防护
+
+**修复：** `_check_content_safety` + `_check_code_safety` 拦截危险模式
+
+```python
+dangerous_patterns = ['import socket', 'os.system(', 'eval(', '__import__(', ...]
+```
+
+### I7/I9：全部 Agent 改 async
+
+**改动文件：**
+
+| 文件 | 改动 |
+|------|------|
+| discussion.py | `proposer_critic_discuss` 改为 async，使用 `call_llm_async` |
+| pm.py | 加 `await` 到 `proposer_critic_discuss` 调用 |
+| architect.py | 同上 |
+| developer.py | 改为 async，使用 `call_llm_with_tools_async` |
+| tester.py | 同上 |
+| reviewer.py | 同上 |
+| llm.py | 新增 `call_llm_with_tools_async` 异步版本 |
+| 测试文件 | 全部改为 `@pytest.mark.asyncio` + `AsyncMock` |
+
+**测试结果：** 260 个后端测试全过
+
+---
+
+## Phase 47：运行时问题修复（2026-06-09）
+
+**问题：** 用户实际运行发现 3 个问题
+
+### Bug 1：Developer 读不到自己写的文件
+
+**现象：** Developer 写了 main.py，但 execute_python 执行时找不到文件。导致 Developer 反复重写同样代码，15 轮迭代。
+
+**根因：** `execute_python` 跑在空临时目录，Developer 写的文件在项目目录。两个目录不互通。
+
+**修复：** `_execute_python` 把项目文件复制到临时目录再执行（排除 .env 等敏感文件）。
+
+### Bug 2：Developer 无限循环（31 轮）
+
+**现象：** Developer→Tester→Reviewer 循环 31 次，`max_iterations` 限制没生效。
+
+**根因：** `route_after_developer` 检查 `iteration >= max_iterations` 路由到 `human_confirm`，但 `human_approved` 为 None 导致回 Developer，死循环。
+
+**修复：** iteration 检查放回 `route_after_test` 和 `route_after_review`，不在 `route_after_developer` 里做。
+
+### Bug 3：Developer 改不掉 Tester/Reviewer 指出的问题
+
+**现象：** Tester 说"代码有 bug"，Developer 重写后还是同样的 bug。
+
+**根因：** Developer 每次被调用时 `build_developer_prompt` 从零构建，没有带上一轮 Tester/Reviewer 的反馈。
+
+**修复：** `build_developer_prompt` 加入 `test_results` 和 `review_comments` 反馈：
+
+```python
+if test_results and not state.get("test_passed", True):
+    user_content += f"\n上一轮测试失败，错误信息：\n{test_results['output'][:500]}\n"
+
+if review_comments and not state.get("review_approved", True):
+    user_content += "\n上一轮代码审查发现的问题：\n"
+    for c in review_comments[:5]:
+        user_content += f"- [{c['severity']}] {c['description']}: {c['suggestion']}\n"
+```
+
+### Bug 4：前端无保存按钮
+
+**现象：** 项目跑完了但没有保存入口。
+
+**修复：** ChatPanel 加 💾 按钮，有文件时显示，点击调 POST /api/projects 保存。
+
+**测试结果：** 260 个后端 + 50 个前端 = 310 个测试全过
+
+---
+
+## 设计：SQLite 记忆层（待实现）
+
+**目标：** 项目持久化 + 刷新恢复 + Developer 上下文记忆
+
+### 设计决策
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| messages 存储 | 单独表，只存摘要 | 不从 executions 重建，快速恢复 |
+| llm_response | 不存 | 太大，存结构化 tool_calls + result_summary 即可 |
+| files 存储 | 不存内容，只存文件名列表 + hash | 文件从磁盘读，不冗余 |
+| project_id 持久化 | localStorage | 刷新后 Pinia 清空，需浏览器存储 |
+| 清理策略 | 每 project 最多 50 条 execution，超过 30 天归档 | 防止 SQLite 无限增长 |
+
+### 表结构
+
+```sql
+-- 项目快照（轻量，存元数据不存文件内容）
+CREATE TABLE project_snapshots (
+    project_id TEXT PRIMARY KEY,
+    requirement TEXT,
+    current_step TEXT,
+    iteration INTEGER DEFAULT 0,
+    files_summary TEXT,          -- JSON: ["main.py", "index.html"]
+    status TEXT DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Agent 执行记录（存结构化数据，不存原始 LLM 返回）
+CREATE TABLE agent_executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    iteration INTEGER NOT NULL,
+    input_summary TEXT,
+    tool_calls TEXT,             -- JSON: [{name, args_summary}]
+    result_summary TEXT,
+    status TEXT DEFAULT 'success',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_exec ON agent_executions(project_id, agent_name, iteration);
+
+-- 聊天消息（前端恢复用）
+CREATE TABLE project_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    name TEXT,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_msg ON project_messages(project_id);
+```
+
+### 读写时机
+
+| 事件 | 写入 | 读取 |
+|------|------|------|
+| 项目开始 | 创建 snapshot + 存 project_id 到 localStorage | — |
+| 用户发消息 | 写 project_messages | — |
+| Agent 输出消息 | 写 project_messages | — |
+| Developer/Tester/Reviewer 完成 | 写 agent_executions（摘要） | — |
+| 图状态变化 | 更新 snapshot.step | — |
+| 项目完成 | 更新 snapshot.status = 'completed' | — |
+| 页面刷新 | — | 读 snapshot + messages 恢复前端 |
+| Developer 启动 | — | 读最近 2 轮 execution 拼摘要 |
+
+### Developer 摘要拼接
+
+```python
+def get_developer_context(project_id: str, current_iteration: int) -> str:
+    rows = db.query("""
+        SELECT agent_name, result_summary, status
+        FROM agent_executions
+        WHERE project_id = ? AND iteration >= ?
+        ORDER BY iteration DESC, agent_name
+        LIMIT 6
+    """, [project_id, current_iteration - 2])
+    
+    if not rows:
+        return ""
+    
+    lines = ["## 之前的尝试："]
+    for row in rows:
+        lines.append(f"- {row.agent_name}（第{row.iteration}轮）: {row.result_summary}")
+    
+    return "\n".join(lines)
+```
+
+### 前端刷新恢复
+
+```javascript
+// 开始项目时
+localStorage.setItem('activeProjectId', projectId)
+
+// 刷新恢复时
+const projectId = localStorage.getItem('activeProjectId')
+if (projectId) {
+  const data = await api.getProjectState(projectId)
+  projectStore.$patch(data)
+}
+```
+
+### 新增 API 端点
+
+| 端点 | 说明 |
+|------|------|
+| GET /api/projects/{id}/state | 返回 snapshot + messages + agentStatus |
+| POST /api/projects/{id}/messages | 写入聊天消息 |
+| POST /api/projects/{id}/executions | 写入 Agent 执行记录 |
+
+---
+
+## Phase 53：SQLite 记忆层实现（2026-06-09）
+
+**目标：** 项目持久化 + 刷新恢复 + Developer 上下文记忆
+
+**实现内容：**
+
+### 后端（memory.py）
+
+- 3 张表：`project_snapshots`、`agent_executions`、`project_messages`
+- 写入：项目开始创建 snapshot，Agent 完成写 execution + messages
+- 读取：`get_developer_context()` 拼最近 2 轮摘要
+
+### 后端（websocket.py）
+
+- 图启动时保存 snapshot
+- 每个 Agent 完成时保存 execution + messages
+- 图完成时更新 snapshot status
+
+### 后端（projects.py）
+
+- 新增 `GET /api/projects/{id}/state` 恢复接口
+
+### 前端（project.js）
+
+- 新增 `restoreFromServer(projectId)` 方法
+
+### 前端（App.vue）
+
+- 页面加载时检查 localStorage 的 `activeProjectId`
+- 有则从后端恢复状态，重建 Agent 进度
+
+### 前端（useWebSocket.js）
+
+- `setActiveProject` 同时存 localStorage
+
+**测试结果：** 全部通过
+
+---
+
+## Phase 54：SQLite 记忆层审查修复 + Developer 记忆接入（2026-06-10）
+
+**来源：** 用户审查 SQLite 记忆层，发现 4 Critical + 10 Important + 7 Minor
+
+**Critical 修复：**
+
+| # | 问题 | 修复 |
+|---|------|------|
+| C1 | save_snapshot kwargs 无白名单 | 加 `_SNAPSHOT_COLUMNS` 集合，拒绝非法列名 |
+| C2 | check_same_thread=False 跨线程 | 改为 `threading.local()` 每线程独立连接 |
+| C3 | websocket.py 子线程调全局单例 | 保留（线程安全双检锁），加文档说明 |
+| C4 | get_project_state 无文件数限制 | 加 `max_files=50` + `max_file_size=1MB` + `skipped_files` 返回 |
+
+**Important 修复：**
+
+| # | 问题 | 修复 |
+|---|------|------|
+| I1 | 消息全量加载 | 加 `limit=200` 限制 |
+| I4 | Agent 状态恢复硬编码 | 保留（顺序固定），加注释 |
+| I5 | 恢复消息覆盖时间戳 | 用原始 `created_at` 而非 `Date.now()` |
+| I7 | 跳过大文件无提示 | 返回 `skipped_files` 列表 |
+| I9 | WebSocket 重连无退避 | 加指数退避（1s → 30s） |
+
+**Developer 记忆接入：**
+- `build_developer_prompt` 加入 `get_developer_context()` 调用
+- Developer 启动时从 SQLite 读最近 2 轮的 Agent 执行记录
+- 拼成摘要注入 prompt，让 Developer 知道之前试过什么、哪里失败了
+
+**测试结果：** 后端 273 + 前端 50 = 323 个全过
+
+**审查验证结果：**
+
+| # | 修复项 | 测试覆盖 |
+|---|--------|---------|
+| C1 | 白名单校验 | ✅ test_save_snapshot_rejects_invalid_columns |
+| C2 | threading.local 并发 | ✅ test_concurrent_access（5线程并发读写） |
+| C4 | 文件数限制 | ✅ 测试确认 |
+| I1 | limit=200 | ✅ test_message_limit_returns_most_recent + 自定义 limit |
+| I4 | 硬编码注释 | ⚠️ 已加注释 |
+| I5 | 原始时间戳 | ✅ 验证通过 |
+| I7 | skipped_files | ✅ 返回列表 |
+| I9 | 指数退避 | ✅ 代码正确 |
+| Developer 记忆 | ✅ | ✅ test_developer_prompt_includes_memory_context + test_developer_prompt_no_memory_on_first_iteration |
+
+**新增 6 个测试：** test_cleanup_with_old_data, test_message_limit_returns_most_recent, test_message_limit_custom_limit, test_concurrent_access, test_developer_prompt_includes_memory_context, test_developer_prompt_no_memory_on_first_iteration
+
+---
+
+## Phase 55：运行时 Bug 修复 + 全链路审查（2026-06-10）
+
+**来源：** 用户实际运行 + 全面链路审查
+
+### Bug 1：保存没实际存下来
+
+**现象：** 用户点保存后项目列表里能看到，但打开没有文件
+
+**根因：** `saveProject()` 创建新的 `proj-{timestamp}` ID，而文件在 `deliver_node` 已写入原 project_id 目录。新项目只有 meta.json。
+
+**修复：**
+- 后端 `POST /api/projects` 改为 upsert（项目已存在时更新 meta.json）
+- 前端 `saveProject()` 使用当前 `projectStore.currentProject?.id`，不再新建 ID
+
+### Bug 2：刷新后显示旧状态
+
+**现象：** 刷新页面后 Agent 状态显示"Developer 执行中"、迭代 13/3
+
+**根因：** snapshot 的 `current_step` 和 `iteration` 是旧值，恢复时直接使用
+
+**修复：**
+- `restoreFromServer` 检查 status 是否为终态（completed/delivered/saved/failed/error）
+- 终态 → 所有 Agent 显示"已完成"
+- websocket.py 图出错时更新 snapshot status 为 "error"
+
+### Bug 3：心跳机制（彻底解决状态不一致）
+
+**问题：** 无法判断"执行中"是真在跑还是已经死了（用户关浏览器、服务器重启等）
+
+**修复：**
+- memory.py 新增 `last_heartbeat` 字段 + `update_heartbeat()` 方法
+- websocket.py 图执行期间每 10 秒更新心跳
+- projects.py 恢复接口返回 `last_heartbeat`
+- 前端恢复时检查心跳：超过 30 秒 → 显示"上次中断"
+
+### Bug 4：迭代死循环
+
+**现象：** Developer→Tester→Reviewer 循环超过 max_iterations
+
+**根因：** `route_after_review` 在 iteration >= max 时路由到 human_confirm，human_confirm approve 后又回 Developer
+
+**修复：** `route_after_review` 在 iteration >= max 时返回 "approve"（直接 deliver）
+
+### Bug 5：`_developer_retry_count` 不递增
+
+**现象：** Developer 失败后无限重试
+
+**根因：** developer.py 异常返回和 MAX_STEPS 返回都缺少 `_developer_retry_count` 字段，永远是 0
+
+**修复：** 两处都加 `_developer_retry_count: state.get(...) + 1`
+
+### Bug 6：`_async_llm_lock` 全局串行
+
+**现象：** Proposer-Critic 内部 LLM 调用被串行化
+
+**根因：** `asyncio.Lock()` 排他锁
+
+**修复：** 改为 `asyncio.Semaphore(5)` 允许并发
+
+### Bug 7：Developer 收不到 Tester 反馈（最关键）
+
+**现象：** Developer 每次从零写代码，反复犯同样错误
+
+**根因：** Tester 返回 `test_results` 是 `list[dict]`，Developer 按 `dict` 读取 → `isinstance(list, dict)` = False → 反馈被丢弃
+
+**修复：** developer.py 兼容 list 和 dict 两种类型
+
+### Bug 8：Reviewer done 工具缺审查字段
+
+**现象：** Reviewer 的 `review_approved` 永远是 True，`review_comments` 永远是空
+
+**根因：** DONE 工具 schema 只有 `summary`/`files_modified`/`key_decisions`，没有 `review_approved`/`review_comments`。LLM 不会输出 schema 外的字段。
+
+**修复：** Reviewer 使用独立的 `REVIEWER_DONE` 工具，包含完整的审查字段
+
+### Bug 9：ProjectState 缺字段（链路断裂根因）
+
+**现象：** 多个 Agent 返回的字段被 LangGraph 静默丢弃
+
+**根因：** ProjectState TypedDict 未声明 `technical_constraints`/`key_decisions`/`project_path`，LangGraph 严格按 schema 合并
+
+**修复：** state.py 补全缺失字段 + create_initial_state 加默认值
+
+### Bug 10：Tester 异常路径丢失错误细节
+
+**现象：** Tester 异常时 Developer 看不到具体错误
+
+**根因：** tester.py 异常返回没有 `test_results` 字段
+
+**修复：** 异常返回加 `test_results: [{"summary": "测试异常：...", "status": "error"}]`
+
+**测试结果：** 276 个后端测试全过
+
+### 全链路验证结果
+
+| 链路 | 状态 |
+|------|------|
+| PM → Architect | ✅ technical_constraints 现在传递 |
+| Architect → human_confirm | ✅ |
+| human_confirm → Developer | ✅ |
+| Developer → Tester | ✅ key_decisions 现在传递 |
+| Tester → Developer | ✅ test_results 类型兼容 + 异常路径有值 |
+| Reviewer → Developer | ✅ REVIEWER_DONE 有审查字段 |
+| Reviewer → route_after_review | ✅ |
+| Developer → deliver | ✅ project_path 现在传递 |
+| SQLite memory → Developer | ✅ |
+
+---
+
+## Phase 55（补全）：回退功能恢复 + 运行时修复（2026-06-10）
+
+**背景：** Phase 55 部分功能被回退，需要恢复。同时手动测试发现 3 个运行时 Bug。
+
+### 一、回退功能恢复（10 项）
+
+| # | 功能 | 文件 | 改动 |
+|---|------|------|------|
+| 1 | `_developer_retry_count` 递增 | developer.py | error + MAX_STEPS 路径都加 `_developer_retry_count: state.get(...) + 1` |
+| 2 | `asyncio.Semaphore` | llm.py | `_async_llm_lock` 从 `asyncio.Lock()` 改为 `asyncio.Semaphore(5)` |
+| 3 | `REVIEWER_DONE` 工具 | tools.py | 新增专用工具定义，含 `review_approved`(bool) + `review_comments`(array)，`REVIEWER_TOOLS` 改用它 |
+| 4 | `ProjectState` 补全字段 | state.py | 新增 `technical_constraints: list[str]` + `key_decisions: list[str]`，`create_initial_state` 加默认值 |
+| 5 | Tester 反馈类型兼容 | developer.py | `build_developer_prompt` 加入 `test_results` 和 `review_comments` 反馈，兼容 `list[dict]` 和 `dict` |
+| 6 | `route_after_review` 迭代检查 | graph.py | iteration >= max 时返回 `"approve"`（直接交付），不再路由到 `human_confirm`（防死循环） |
+| 7 | 心跳机制 | websocket.py | 新增 `_heartbeat_loop` 异步任务，每 10 秒调用 `mem.update_heartbeat(project_id)` |
+| 8 | WebSocket 日志 | websocket.py | 模块级 `logger`，连接/断开/启动/Agent完成/Error 全部有结构化日志 |
+| 9 | 前端消息去重 | useWebSocket.js + project.js | WebSocket 层 `seenMessageIds` Set 去重；store 层 `addMessage` 检查最后一条重复；指数退避 1s→30s |
+| 10 | 保存 upsert | projects.py + project.js | POST `/api/projects` 已存在时更新 meta.json（不再 409）；前端新增 `saveProject()` action |
+
+### 二、全链路修复（3 项）
+
+| # | 链路断裂点 | 文件 | 修复 |
+|---|-----------|------|------|
+| 1 | Tester 异常路径缺 `test_results` | tester.py | 异常返回加 `test_results: [{"summary": "测试异常：...", "status": "error"}]` |
+| 2 | Reviewer 超步数 `review_approved` 仍为 True | reviewer.py | 超步数时设 `collected_review_approved = False` |
+| 3 | Developer 成功后未重置 `test_passed` | developer.py | 成功返回加 `test_passed: True` |
+
+### 三、运行时修复（3 项）
+
+**来源：** 手动测试发现
+
+#### Bug 1：Developer 死循环（最关键）
+
+**现象：** Developer iter=1~4 全是 Developer，Tester 从未出现
+
+**根因分析（系统调试）：**
+1. LLM 调用 `file_write` + `execute_python` 但不调 `done`
+2. 跑满 MAX_STEPS 后返回 `error: "超过最大步数"`
+3. `route_after_developer` 看到 error → 路由回 Developer
+4. `_developer_retry_count` 递增但 MAX_STEPS 返回也递增 → 循环
+
+**修复：** `files_written` 非空 + 本轮无新写入 → 隐式完成，break。MAX_STEPS 从 10 改为 5。
+
+```python
+# 典型流程：
+# 轮次 1: file_write a.py → this_round_new_writes = 1 → 继续
+# 轮次 2: file_write b.py → this_round_new_writes = 1 → 继续
+# 轮次 3: execute_python  → this_round_new_writes = 0，files_written 非空 → break
+```
+
+**新增测试：** `test_developer_implicit_done_with_files`（验证 2 轮 LLM 调用即完成）
+
+#### Bug 2：刷新后页面重置
+
+**现象：** `GET /api/projects/{id}/state` 返回 404
+
+**根因：** endpoint 完全不存在，前端 `restoreFromServer` 调了但后端没实现
+
+**修复：** projects.py 新增 `GET /api/projects/{project_id}/state` 端点，读 SQLite snapshot + messages + 磁盘文件
+
+#### Bug 3：没有保存按钮
+
+**现象：** 用户无法保存项目
+
+**修复：** ChatPanel header 常驻 💾 按钮 + `saveProject()` action（upsert）
+
+### 四、测试更新
+
+| 测试 | 改动 |
+|------|------|
+| `test_create_project_duplicate` | 409 → 200（upsert 行为） |
+| `test_developer_max_steps` | 改用 `file_read`（无文件写入才触发 max steps） |
+| `test_developer_implicit_done_with_files` | 新增：验证 2 轮 LLM 调用即完成 |
+
+**测试结果：** 后端 272 + 前端 50 = 322 个全过
+
+### 五、全链路验证结果（更新）
+
+| 链路 | 关键字段 | 状态 |
+|------|---------|------|
+| PM → Architect | `technical_constraints` | ✅ state.py 已声明 |
+| Developer → Tester | `key_decisions` | ✅ state.py 已声明 |
+| Tester → Developer | `test_results` 类型 | ✅ 兼容 list/dict + 异常路径有值 |
+| Reviewer → Developer | `REVIEWER_DONE` schema | ✅ 含 review_approved + review_comments |
+| Reviewer → Developer（超步数） | `review_approved` | ✅ 超步数 = False |
+| Developer 成功后 | `test_passed` 重置 | ✅ 返回 True |
+| Developer 失败时 | `_developer_retry_count` | ✅ error + MAX_STEPS 都递增 |
+| route_after_review | 迭代上限 | ✅ 直接 approve 交付 |
+| Developer 隐式完成 | files_written | ✅ 无新写入即保存 |
+| SQLite → Developer | 记忆上下文 | ✅ Phase 54 |
+| asyncio 并发 | LLM 调用 | ✅ Semaphore(5) |
+| 页面刷新恢复 | /state endpoint | ✅ 新增 |
+| 项目保存 | upsert | ✅ POST 已存在时更新 |
+
+#### Bug 4：保存按钮点击无效
+
+**现象：** 点击 💾 按钮无反应，日志无 `POST /api/projects` 请求
+
+**根因：** `saveProject()` 检查 `this.currentProject?.id`，但 `sendMessage` 和 `retryMessage` 虽然生成了 `projectId`，从未设置 `projectStore.currentProject`，导致函数提前 `return false`
+
+**修复：** ChatPanel.vue 的 `sendMessage` 和 `retryMessage` 中加 `projectStore.currentProject = { id: projectId, requirement: text }`
+
+**测试结果：** 后端 272 + 前端 50 = 322 个全过
+
+---
+
+## Phase 55（补全续）：前后端对齐 + SPA 路由修复（2026-06-10）
+
+**来源：** 手动测试 + 全线前后端对齐审查（17 个问题）
+
+### 一、Critical 修复（4 项）
+
+#### Bug 5：SPA 路由 404（最影响体验）
+
+**现象：** 访问 `/projects`、`/settings` 等页面返回 `{"detail":"Not Found"}`
+
+**根因：** start.py 只注册了旧式 `.html` 路由（`/login.html`、`/projects.html` 等），Vue SPA 的 clean URL（`/login`、`/projects`）没有 catch-all 路由
+
+**修复：**
+- 删除 5 个旧 `.html` 路由（`login.html`、`projects.html`、`project-detail.html`、`settings.html`、`index.html`）
+- 删除 4 个零散 SPA 路由（`/projects`、`/settings`、`/login`、`/project/{path}`）
+- 改为单个 `/{path:path}` 通用 catch-all，跳过 `api/`、`assets/`、`static/` 前缀
+
+#### Bug 6：保存后项目列表为空
+
+**现象：** `POST /api/projects` 返回 200，但项目列表看不到项目
+
+**根因：** `_projects_dir()` 返回 `devteam/projects/`（`parent.parent`），但 Developer 和 deliver_node 写文件到 `projects/`（CWD 相对路径）。两个路径不一致，meta.json 和项目文件分散在两个目录
+
+**修复：** `parent.parent` → `parent.parent.parent`，统一到 `Many AgentS/projects/`
+
+#### Bug 7：agentStatus 从不同步
+
+**现象：** 刷新页面后 Agent 状态全部丢失
+
+**根因：** `useWebSocket.js` 的 `state_sync` handler 读 `data.data.agent_status`，但后端 `create_initial_state` 没有 `agent_status` 字段，永远是 undefined
+
+**修复：** 收到 `state_sync` 时初始化所有 Agent 为 `waiting`，后续 `agent_start`/`agent_done` 消息会实时更新
+
+#### Bug 8：maxIterations 硬编码
+
+**现象：** 前端迭代计数器永远显示 `/3`，即使用户在设置页改了最大迭代次数
+
+**根因：** `projectStore.maxIterations` 硬编码为 3，从未从后端同步
+
+**修复：** App.vue `onMounted` 时 `fetch('/api/settings')` 获取 `max_iterations` 并更新 store
+
+### 二、Dead Code 清理
+
+| 位置 | 代码 | 状态 |
+|------|------|------|
+| `useWebSocket.js` | `case 'agent_thinking'` handler | 删除（后端从不发送） |
+| `start.py` | `/project/{path:path}`（单数） | 删除（Vue 路由是 `/projects/:id` 复数） |
+| `start.py` | 5 个 `.html` 路由 | 删除（Vue SPA 替代） |
+| `projects.py` | `POST /api/resume/rethink/cancel` | 保留（后端 REST 端点，前端通过 WebSocket 调用，不碍事） |
+| `websocket.py` | `reconnect` handler | 保留（后端有处理但前端不发送，不碍事） |
+
+### 三、前后端对齐审查结果
+
+| 类别 | 数量 | 说明 |
+|------|------|------|
+| 前端调用的 API | 15 个 | 全部有后端对应 ✅ |
+| 后端提供的 API | 17 个 | 2 个 dead（resume/rethink/cancel 通过 WebSocket） |
+| WebSocket 消息类型 | 7 种 | 全部有前端 handler ✅ |
+| 前端发送的 WS 消息 | 3 种 | start_project/resume/cancel 全部有后端 handler ✅ |
+| 状态字段对齐 | 10 个 | 修复 2 个（agentStatus/maxIterations） |
+
+**测试结果：** 后端 272 + 前端 50 = 322 个全过
+
+---
+
+## Phase 55（补全续）：error 残留 + 死循环 + 取消按钮（2026-06-10）
+
+**来源：** 手动测试（计算器项目运行）
+
+### 一、核心 Bug：LangGraph error 残留导致 Agent 链路断裂（最关键）
+
+**现象：** Developer 写了文件但永远到不了 Tester，iter=1~7 全是 Developer
+
+**日志证据：**
+```
+iter=1: Developer error: APIConnectionError → state["error"] = "APIConnectionError..."
+iter=2: Developer success → 返回 {files, test_passed: True}（无 error key）
+        → LangGraph 不清除旧 error → route_after_developer 看到残留 error → 重试
+iter=3~7: 同上，error 永远残留 → 永远重试 → Tester 永远不执行
+```
+
+**Root Cause：** LangGraph 的 state 合并是"只更新返回的 key"，不返回的 key 保留旧值。如果 Agent 第一次返回 `{"error": "失败"}`，第二次返回 `{"files": ...}`（无 error），旧 error 值永远残留。
+
+**修复：** 所有 Agent 成功路径必须显式返回 `"error": None`
+
+| Agent | 修复前 | 修复后 |
+|-------|--------|--------|
+| developer.py | 成功不设 error | ✅ `"error": None` |
+| tester.py | 成功不设 error | ✅ `"error": None` |
+| architect.py | 成功不设 error | ✅ `"error": None` |
+| pm.py | 已有 | ✅ 无需改 |
+| reviewer.py | 已有 | ✅ 无需改 |
+
+**教训：** LangGraph TypedDict 的 state 合并是"补丁式"不是"替换式"。任何可能被路由函数检查的字段，成功时都必须显式清除。
+
+### 二、Developer 空文件死循环
+
+**现象：** LLM 不生成任何文件 → implicit done（files={}）→ Tester 空转 → fail → 循环
+
+**修复：** `files_written` 为空时设 `error: "Developer 未生成任何文件"`，重试 2 次后 END
+
+### 三、取消按钮
+
+**现象：** 用户无法停止正在运行的 Agent 任务
+
+**修复：** ChatPanel 新增 ⏹ 按钮，发送 `{type: "cancel"}` 到后端，不清空聊天
+
+### 四、迭代计数器
+
+**确认：** IterationInfo 组件仍在 FlowPanel 中（line 7），`v-if="projectStore.iteration > 0"` 条件显示。useWebSocket.js 的 `agent_update` handler 正确同步 `data.data.iteration`。
+
+**测试结果：** 后端 272 + 前端 50 = 322 个全过
+
+---
+
+## Phase 55（补全续）：error 残留验证 + 项目列表字段修复（2026-06-11）
+
+**来源：** v1 对比测试 + 手动测试
+
+### 一、v1 对比验证：确认 error 残留是 v1 的 bug
+
+**方法：** 用 v1 备份跑同一个需求，对比日志
+
+**v1 日志：**
+```
+Developer iter=1: APIConnectionError
+Developer iter=2: Files written (3)  ← 成功但没清 error
+Developer iter=3~9: 全是 Developer   ← error 残留，永远重试
+Tester: 从未执行
+```
+
+**当前版本日志：**
+```
+Developer iter=1: APIConnectionError → route_after_developer: error='Connection error.' → retry
+Developer iter=2: Files written (10) → route_after_developer: error=None → tester ✅
+Tester iter=2: test_passed=False → route_after_test → developer (fail)
+Developer iter=3: Files written (10) → route_after_developer → tester ✅
+Tester iter=3: test_passed=False → route_after_test → reviewer (max iterations) ✅
+Reviewer iter=3: approved=False → route_after_review → deliver (max iterations) ✅
+deliver → 项目完成
+```
+
+**结论：** `"error": None` 修复是正确的。v1 的 Developer 成功时不设 error，LangGraph 保留旧值，导致永远重试。
+
+### 二、路由日志验证
+
+**新增日志：** graph.py 的 `route_after_developer`、`route_after_test`、`route_after_review` 都加了 `logger.info`，输出每一步的决策。
+
+**效果：** 终端现在能看到完整链路：
+```
+route_after_developer: error=None, files=[...], retry=0
+route_after_developer → tester
+route_after_test: test_passed=False, iteration=2/3
+route_after_test → developer (fail)
+route_after_review: approved=False, iteration=3/3
+route_after_review → deliver (max iterations)
+```
+
+### 三、Tester/Reviewer 日志验证
+
+**新增日志：**
+- `Tester started, files: [...]`
+- `Tester done: test_passed=True/False`
+- `Reviewer started, files: [...]`
+- `Reviewer done: approved=True/False`
+
+**效果：** 确认 Tester 和 Reviewer 确实在执行（之前没有日志，看起来像断了）。
+
+### 四、项目列表字段不匹配修复
+
+**现象：** 项目保存成功（POST 200），磁盘有 meta.json，但前端项目页面显示空白
+
+**根因：** 后端 `GET /api/projects` 返回 `project_id`/`requirement`，前端 ProjectsPage.vue 读 `p.id`/`p.name` — 字段名不匹配，渲染出 `undefined`
+
+**修复：** ProjectsPage.vue 的 `v-for` 改用后端实际字段名：
+- `p.id` → `p.project_id`
+- `p.name` → `p.requirement`
+- `p.created_at` → `p.iteration`（后端没返回 created_at）
+
+**测试结果：** 后端 272 + 前端 50 = 322 个全过
+
+---
+
+## Phase 56：通讯页面 UX 改进（2026-06-11）
+
+**目标：** 将通讯页面从纯文本聊天升级为结构化 Agent 输出 + 暂停/继续 + 保存命名 + 代码预览
+
+**设计文档：** `docs/superpowers/specs/2026-06-11-workbench-ux-improvements-design.md`
+**实施计划：** `docs/superpowers/plans/2026-06-11-workbench-ux-improvements.md`
+
+### 实施内容（11 个 Task，8 个子代理并行）
+
+| Task | 内容 | 新增/修改文件 | 状态 |
+|------|------|-------------|------|
+| 1 | useFilePreview composable（highlight.js 语法高亮） | `composables/useFilePreview.js` + 测试 | ✅ |
+| 2 | AgentOutputCard 组件（结构化 Agent 输出卡片） | `components/AgentOutputCard.vue` + 测试 | ✅ |
+| 3 | SaveDialog 组件（保存命名弹窗） | `components/SaveDialog.vue` + 测试 | ✅ |
+| 4 | AgentCard 可交互（点击展开 + 耗时） | `components/AgentCard.vue` 重写 | ✅ |
+| 5 | IterationInfo 进度可视化（变色 + 加粗） | `components/IterationInfo.vue` 改造 | ✅ |
+| 6 | 后端 WebSocket pause/stop/resume | `api/websocket.py` + `tests/test_websocket_pause.py` | ✅ |
+| 7a | ChatHeader 组件（操作栏拆分） | `components/ChatHeader.vue` + 测试 | ✅ |
+| 7b | store + WebSocket 消息处理 | `stores/project.js` + `composables/useWebSocket.js` | ✅ |
+| 7c | ChatPanel 拆分引用 ChatHeader + SaveDialog | `components/ChatPanel.vue` 重构 | ✅ |
+| 8 | 保存命名（后端 name 字段 + 前端传参） | `api/projects.py` + `stores/project.js` | ✅ |
+| 9 | OutputPanel 文件预览（语法高亮 + 复制） | `components/OutputPanel.vue` 改造 | ✅ |
+| 10 | 异常状态处理（断连/失败/空内容兜底） | ChatHeader + SaveDialog + OutputPanel | ✅ |
+
+### 新增组件
+
+| 组件 | 文件 | 职责 |
+|------|------|------|
+| AgentOutputCard.vue | components/AgentOutputCard.vue | 根据 Agent 类型显示结构化卡片（PM 蓝/Developer 绿/Tester 橙/Reviewer 粉） |
+| SaveDialog.vue | components/SaveDialog.vue | 保存命名弹窗，自动填入需求前 15 字，可编辑 |
+| ChatHeader.vue | components/ChatHeader.vue | 操作栏：运行中显示暂停，暂停中显示继续+停止，空闲时显示保存+清空+新建 |
+
+### 新增 composable
+
+| Composable | 文件 | 职责 |
+|------------|------|------|
+| useFilePreview.js | composables/useFilePreview.js | 文件预览逻辑 + highlight.js 语法高亮（5 种语言） |
+
+### 后端改动
+
+| 文件 | 改动 |
+|------|------|
+| websocket.py | 新增 pause/resume_execution/stop 消息处理 + `_send_heartbeat` 心跳函数 + 节点边界 stop_event 检查 |
+| projects.py | POST 新增 `name` 字段 + GET 返回 `name` |
+
+### 前端改动
+
+| 文件 | 改动 |
+|------|------|
+| project.js | 新增 isPaused/isRunning/saveDialogVisible/autoSaveName/agentStartTime |
+| useWebSocket.js | 新增 paused/resumed/stopped/heartbeat 消息处理 + agent_start 设 isRunning |
+| ChatPanel.vue | 拆分：用 ChatHeader 替代操作栏 + 集成 SaveDialog + handleSave 逻辑 |
+| AgentCard.vue | 可交互：点击展开/折叠 + 执行耗时计时 |
+| IterationInfo.vue | 进度条加粗 8px + 动态变色（绿→黄→红） |
+| OutputPanel.vue | 文件点击预览 + 语法高亮 + 复制按钮 + 空内容占位符 |
+
+### 前端依赖新增
+
+| 依赖 | 版本 | 用途 |
+|------|------|------|
+| highlight.js | ^11.x | 代码语法高亮（~40KB gzip） |
+
+**测试结果：** 后端 279 + 前端 72 = 351 个全过
+
+---
+
+## Phase 57：Code Review + 四层可靠性架构审计（2026-06-11）
+
+**来源：** 子代理 Code Review + 四层全链路可靠性架构审计
+
+### 一、Code Review 修复（11 项，全部修复完毕 ✅）
+
+这些是代码层面的 bug，不是四层架构问题。
+
+| # | 级别 | 问题 | 修复 |
+|---|------|------|------|
+| C1 | Critical | graph.py 死亡路由边 `human_confirm` | ✅ 删除 |
+| C2 | Critical | error 消息说 "10步" 但 MAX_STEPS=5 | ✅ 改为 "5步" |
+| C3 | Critical | resume 时发两次 `resumed` 消息 | ✅ 删除 graph 线程重复发送 |
+| C4 | Critical | resume 时 heartbeat 未取消 | ✅ resume 处理中 cancel heartbeat_task |
+| I1 | Important | graph.py 重复 `import logging` | ✅ 移到模块级 |
+| I2/I8 | Important | projects.py 自建 memory 单例 | ✅ 改用 `get_memory()` 共享单例 |
+| I3 | Important | tool_executor 复制 node_modules | ✅ 加入跳过列表 |
+| I4 | Important | Developer 记忆未接入 | ✅ `build_developer_prompt` 调用 `get_developer_context()` |
+| I5 | Important | v-html XSS 漏洞 | ✅ 安装 DOMPurify sanitize |
+| I10 | Important | autoSaveName 未填充 | ✅ `sendMessage` 时从需求自动生成 |
+| M5 | Minor | AgentOutputCard 未接入 ChatPanel | ✅ store 新增 `agentOutputs`，ChatPanel 用 AgentOutputCard 渲染 |
+
+### 二、四层可靠性架构审计结果
+
+**审计方法：** 对照四层架构（结构化定义/推理策略/执行护栏/自愈修复），逐个检查 5 个 Agent。
+
+**总览：**
+
+| Agent | L1 结构化定义 | L2 推理策略 | L3 执行护栏 | L4 自愈修复 |
+|-------|:---:|:---:|:---:|:---:|
+| PM | ✅ | ✅ | ✅ | ✅ |
+| Architect | ✅ | ⚠️ | ⚠️ | ⚠️ |
+| Developer | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| Tester | ⚠️ | ⚠️ | ✅ | ❌ |
+| Reviewer | ⚠️ | ⚠️ | ✅ | ❌ |
+
+### 三、四层架构问题（全部修复完毕 ✅）
+
+#### P0（必须修）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 1 | `call_llm_with_tools_async` 无重试 | ✅ 加 2 次重试 + 指数退避（与同步版一致） |
+| 2 | Tester/Reviewer 无 `_retry_count` | ✅ state.py 新增 `_tester_retry_count`/`_reviewer_retry_count`；tester.py/reviewer.py 错误路径递增；路由函数检查 retry >= 2 时跳过 |
+
+#### P1（应该修）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 3 | 重试不带错误信息 | ✅ 5 个 Agent 的 prompt 构建函数都加了 `prev_error` 注入：`"⚠️ 上一次执行失败，错误：{error}，请避免重复同样的错误"` |
+| 4 | Architect 无 `check_injection` | ✅ architect_agent 入口加 `check_injection(user_feedback)` |
+| 5 | 安全检查不一致 | ✅ 统一为 `_DANGEROUS_PATTERNS` 列表（含 subprocess/requests/shutil.rmtree/os.unlink/Path.unlink）；`_check_content_safety` 扩展到 .html 文件（拦 script/onerror/onload）；`_check_code_safety` 使用同一列表 |
+
+#### P2（后续迭代）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 6 | Pydantic schema 白定义 | ⚠️ 保留现状 — 当前 Agent 使用 tool calling 模式，工具 schema 已提供参数校验。Pydantic schema 留作未来 Agent 改回 JSON 输出模式时使用 |
+| 7 | 工具描述太简陋 | ✅ file_write/file_read/execute_python 描述补充路径规则（不能含 ..、不能绝对路径）、内容约束（不能含 subprocess/eval）、沙箱说明 |
+
+#### P3（低优先级）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 8 | `_validate_path` 死代码 | ✅ 删除函数 + 删除对应 3 个测试 |
+
+### 四、Agent 逐个审计详情
+
+#### PM Agent — 全线达标 ✅
+
+| 层 | 状态 | 证据 |
+|----|------|------|
+| L1 结构化定义 | ✅ | PMOutput Pydantic schema + field_validator 强制 user_stories 非空 + prompt 完整 JSON 模板 |
+| L2 推理策略 | ✅ | prompt 6 步推理策略 + Proposer-Critic + 正例明确 |
+| L3 执行护栏 | ✅ | check_injection(requirement) + PMOutput(**parsed) Pydantic 强校验 |
+| L4 自愈修复 | ✅ | JSONDecodeError/Exception catch + _pm_retry_count + 路由重试 2 次 + Clarification interrupt |
+
+#### Architect Agent — 缺注入检测和工具描述
+
+| 层 | 状态 | Gap |
+|----|------|-----|
+| L1 结构化定义 | ✅ | ArchitectOutput Pydantic schema + prompt 完整 JSON 模板 |
+| L2 推理策略 | ⚠️ | 有 4 步推理流程，但无正负例 |
+| L3 执行护栏 | ⚠️ | 有 Pydantic 校验，但无 check_injection（user_feedback 直接拼入 prompt） |
+| L4 自愈修复 | ⚠️ | 有重试机制，但重试不带错误信息 |
+
+#### Developer Agent — 四层都有短板
+
+| 层 | 状态 | Gap |
+|----|------|-----|
+| L1 结构化定义 | ⚠️ | 工具描述太简陋；DeveloperOutput schema 定义了但未使用 |
+| L2 推理策略 | ⚠️ | 无思维链要求；无正负例 |
+| L3 执行护栏 | ⚠️ | _check_content_safety 只拦 .py；_check_code_safety 不拦 subprocess |
+| L4 自愈修复 | ⚠️ | call_llm_with_tools_async 无重试；重试不带错误上下文 |
+
+#### Tester Agent — 缺自身重试
+
+| 层 | 状态 | Gap |
+|----|------|-----|
+| L1 结构化定义 | ⚠️ | TesterOutput schema 未使用；done 工具无 Tester 专用参数 |
+| L2 推理策略 | ⚠️ | 无正负例、无思维链、无 Proposer-Critic |
+| L3 执行护栏 | ✅ | 无 file_write 权限 + _extract_test_passed 双重校验 |
+| L4 自愈修复 | ❌ | 无 _tester_retry_count；Tester 自身崩溃时不重试 |
+
+#### Reviewer Agent — 最薄弱
+
+| 层 | 状态 | Gap |
+|----|------|-----|
+| L1 结构化定义 | ⚠️ | REVIEWER_DONE 有结构化参数，但 review_comments 的 file/line 不是 required |
+| L2 推理策略 | ⚠️ | 有 5 维审查规则，但无 Proposer-Critic、无正负例 |
+| L3 执行护栏 | ✅ | 只有 FILE_READ + REVIEWER_DONE，无写入/执行权限 |
+| L4 自愈修复 | ❌ | 无 _reviewer_retry_count；超步数设了 error 但路由函数忽略它 |
+
+---
+
+## Phase 58：运行时修复 + 存储优化（2026-06-12）
+
+**来源：** 手动测试发现的问题
+
+### 一、HTML 安全检查太激进（P0 紧急修复）
+
+**现象：** Developer/Tester/Reviewer 写 HTML 文件时反复报 `ValueError: HTML 文件内容包含不允许的模式: <script`，所有迭代浪费
+
+**根因：** Phase 57 加的 `_DANGEROUS_HTML_PATTERNS` 拦截了 `<script`、`onload=` 等 HTML 必需标签。这是代码生成工具，HTML 文件必须有 `<script>` 才能运行
+
+**修复：** 删除 `_DANGEROUS_HTML_PATTERNS`，`_check_content_safety` 只检查 .py 文件。XSS 风险已由 OutputPanel 的 DOMPurify 处理
+
+### 二、消息大量重复
+
+**现象：** 前端通讯页面 PM/Tester/Reviewer 消息重复显示多次
+
+**根因：** websocket.py 发送 `agent_update` 时包含 Agent 的完整内部对话（含 system prompt），每次迭代都重复发送
+
+**修复：** websocket.py 过滤 `agent_update` 消息，只发带 `agent.name` 的输出消息和 `role: "tool"` 的工具结果
+
+### 三、SQLite 存储优化
+
+**现象：** 刷新页面后消息丢失（200 条限制被垃圾消息占满）
+
+**根因：** websocket.py 存消息到 SQLite 时不过滤，Agent 的 system prompt 每次迭代都存一遍
+
+**修复：**
+- 只存 `msg.name == node_name`（Agent 输出）和 `role == "tool"`（工具结果）
+- 新增 `_extract_agent_summary()` 函数，提取结构化摘要存入 `agent_executions.result_summary`
+- 新增 `_extract_chat_message()` 函数，提取精简消息存入 `project_messages`
+
+**效果：** 每 Agent 每轮只存 1 条精简消息（~100 字），200 条限制不再被占满
+
+### 四、Token 过期自动跳转
+
+**现象：** JWT token 过期后 WebSocket 返回 403，页面卡死
+
+**修复：** useWebSocket.js 新增 `isTokenExpired()` 函数，`connect()` 连接前检查 token 过期 → 自动跳登录页
+
+### 五、ProjectsPage 字段不完整
+
+**现象：** 项目列表不显示用户命名的项目名称
+
+**修复：** ProjectsPage.vue 优先显示 `p.name`，fallback 到 `p.requirement` 再到 `p.project_id`
+
+**测试结果：** 后端 276 + 前端 72 = 348 个全过
+
+---
+
+## Phase 59：项目详情页重构（2026-06-12 已完成 ✅）
+
+**目标：** 将简陋的项目详情页重构为"项目仪表盘"，支持完整开发日志、执行摘要、操作按钮
+
+### 一、三层数据存储
+
+| 层 | 存什么 | 表 | 空间估算 |
+|---|--------|-----|---------|
+| 精简摘要 | 每 Agent 1 条，聊天显示用 | project_messages（已有） | ~200B/条 |
+| 结构化摘要 | 耗时、结果、状态 | agent_executions（已有） | ~500B/条 |
+| 完整对话 | Agent 的完整 LLM 对话 | 新增 agent_conversations | ~2-5KB/轮 |
+
+**空间估算：** 5 Agent × 4 轮 × 5KB = 100KB/项目，100 个项目才 10MB
+
+### 二、项目详情页卡片布局
+
+| 卡片 | 内容 | 数据来源 |
+|------|------|---------|
+| 📋 项目信息 | 名称、时间、状态、迭代、需求原文 | meta.json |
+| 💬 开发日志 | 完整 Agent 对话（可折叠展开） | agent_conversations 表 |
+| 📁 生成文件 | 文件树 + 预览 + 下载 | 磁盘文件 |
+| 📊 执行摘要 | 每 Agent 结构化摘要 | agent_executions.result_summary |
+
+### 三、操作按钮
+
+| 按钮 | 功能 | 实现 |
+|------|------|------|
+| 🔄 重新运行 | 用同一个需求重跑 | 前端跳转工作台 + 自动发消息 |
+| ✏️ 编辑需求 | 修改需求后重跑 | 弹窗编辑 → 跳转工作台 |
+| 📤 导出项目 | 下载完整包（文件 + 元数据 + 日志） | 后端打包 zip |
+
+### 四、改动范围
+
+**后端（3 个文件）：**
+
+| 文件 | 改什么 |
+|------|--------|
+| memory.py | 新增 `agent_conversations` 表 + `save_conversation()` / `get_conversations()` |
+| websocket.py | `_run_graph_sync` 里把完整 LLM 对话写入新表 |
+| projects.py | `GET /state` 返回 conversations + executions；新增 `GET /export` 打包下载 |
+
+**前端（4 个文件）：**
+
+| 文件 | 改什么 |
+|------|--------|
+| ProjectDetailPage.vue | 重写为仪表盘（4 卡片 + 懒加载 + 3 操作按钮） |
+| api/index.js | 新增 getProjectConversations/getProjectExecutions/exportProject/getProjectState |
+| stores/project.js | 新增 pendingRequirement 字段 |
+| ChatPanel.vue | onMounted 检查 pendingRequirement 自动发送 |
+
+**通讯页面 💾 保留不动。**
+
+### 实施结果
+
+| Task | 内容 | 状态 |
+|------|------|------|
+| 1 | memory.py — agent_conversations 表 + get_executions + tool_calls | ✅ |
+| 2 | websocket.py — 存完整对话（过滤 system）+ tool_calls 提取 | ✅ |
+| 3 | projects.py — GET /conversations + /executions + /export + name 字段 | ✅ |
+| 4 | 前端 API 方法 + pendingRequirement store | ✅ |
+| 5 | ProjectDetailPage 重写（4 卡片 + 懒加载 + 操作按钮） | ✅ |
+| 6 | ChatPanel pendingRequirement 自动发送 + sessionStorage 兜底 | ✅ |
+
+**测试结果：** 后端 283 + 前端 72 = 355 个全过
+
+### Code Review 修复（2026-06-12）
+
+| 级别 | 问题 | 修复 |
+|------|------|------|
+| C2 | WebSocket 发送 raw BaseMessage 对象给前端 | 改用 `dict_msgs`（已转换的 dict） |
+| C3 | `m.dict()` Pydantic v2 不兼容 | 改为 `model_dump()` 优先，fallback `dict()` |
+| C4 | Export 跟随符号链接可能泄露文件 | 加 `not fpath.is_symlink()` |
+| I1 | agent_conversations 索引缺列 | 改为 `(project_id, agent_name, iteration)` 复合索引 |
+| I3 | /conversations 的 json.loads 无 try/except | 加 `json.JSONDecodeError` 捕获，返回空列表 |
+| I6 | websocket.py 重复 `import asyncio as _asyncio` | 删除重复 |
+| I10 | Export 的 executions tool_calls 双重编码 | 导出前先 `json.loads` 解析 |
+
+**C1 不是 bug**（`not None` = True = "success" 逻辑正确）
+**I4 是设计决策**（`window.open` 无法带 auth header，export 端点暂不做认证）
+
+**测试结果：** 后端 283 + 前端 72 = 355 个全过
+
+---
+
+## Phase 60：Developer 代码质量 + 链路闭环修复（2026-06-12）
+
+**来源：** 手动测试发现 Developer 生成代码质量差 + 链路不闭环
+
+### 一、Developer 死循环后直接 END（应让用户决定）
+
+**现象：** Developer 重试 2 次失败后 graph 直接 END，项目终止，用户无法干预
+
+**修复：**
+- `route_after_developer` max retries 时路由到 `human_confirm`（不再 END）
+- `human_confirm_node` 检测 `is_dev_retry`，显示不同消息："Developer 已重试 2 次仍失败，是否继续？"
+- 用户确认 → 重置 retry count + 清除 error → Developer 重新开始
+- 用户拒绝 → 直接交付已有文件（route to deliver）
+- `route_after_human` 新增 deliver 路径判断
+- graph 新增 `human_confirm → deliver` 边
+
+### 二、Tester/Reviewer 不给修复建议
+
+**现象：** Tester 只说"测试失败"，Reviewer 只说"审查不通过"，Developer 不知道怎么改
+
+**修复：**
+- Tester prompt 加："如果有失败的测试，必须在 summary 中给出具体的修复建议"
+- Reviewer prompt 加："每个问题的 suggestion 字段必须给出具体的修复建议"
+- Developer 反馈注入精简：测试摘要 300 字 + 审查建议只提取 suggestion 合并一行
+
+### 三、Developer 代码质量差
+
+**现象：** 生成的页面空白、功能缺失
+
+**根因分析：**
+- MAX_STEPS = 5 太少，写不完多文件项目
+- 错误注入 + 测试反馈 + 审查反馈同时注入，上下文噪音太大（15 行干扰信息）
+- LLM 被大量反馈淹没，无法专注于写代码
+
+**修复：**
+- MAX_STEPS 5 → 8（给 LLM 更多步骤写完所有文件）
+- 错误注入精简：500 字 → 200 字
+- 测试反馈精简：800 字完整报告 → 300 字摘要
+- 审查反馈精简：逐条列出 → 只提取 suggestion 合并一行
+- 最终 prompt 从 15 行干扰信息减到 7 行
+
+**修复前后对比：**
+```
+修复前（15行）：                     修复后（7行）：
+需求：...                            需求：...
+架构：{完整JSON}                     架构：{简洁JSON}
+API：...                             迭代：第4次
+数据模型：...
+迭代：第4次                           ⚠️ 上次失败：超过最大步数（8步）
+                                      测试反馈：US-001通过, US-003爱心烟花未实现
+⚠️ 上一次执行失败，错误：...           审查建议：创建index.html
+请避免重复同样的错误。
+
+## 上一轮测试结果（必须根据以下建议修复代码）
+US-001: ✅ ...
+US-002: ✅ ...
+US-003: ❌ ...
+
+## 上一轮代码审查问题（必须根据suggestion修复）
+- [critical] index.html:1 ...
+  修复建议：...
+- [important] 烟花粒子...
+  修复建议：...
+```
+
+### 四、全链路验证
+
+| 场景 | 路由 | 状态 |
+|------|------|------|
+| Developer 成功 → Tester | route_after_developer → tester | ✅ |
+| Tester 失败 → Developer | route_after_test → developer | ✅ |
+| Developer 重试失败 → 用户决策 | route_after_developer → human_confirm | ✅ |
+| 用户确认继续 → Developer | route_after_human → developer（重置 retry） | ✅ |
+| 用户拒绝停止 → 交付 | route_after_human → deliver | ✅ |
+| Developer 安全错误 → END | route_after_developer → END | ✅ |
+
+**测试结果：** 后端 283 + 前端 72 = 355 个全过
+
+### 五、Tester test_passed 提取 bug（2026-06-12）
+
+**现象：** Tester summary 显示"✅ 全部通过（12组测试，0失败）"，但 `test_passed=False`，导致 Developer 白跑一轮
+
+**根因：** `_extract_test_passed` 的失败指标检查 `"失败"` 匹配到了"0失败"，但排除条件 `"0 失败"`（有空格）不匹配 `"0失败"`（无空格）
+
+**修复：**
+- 新增明确的通过指标优先检查：`"全部通过"`, `"all passed"`, `"0 fail"`, `"0 error"`, `"0失败"`, `"0 失败"`
+- 通过指标命中 → 直接返回 True，不再走失败指标检查
+- 失败指标的排除条件加上无空格版本 `"0失败"`
+
+### 六、Developer 只写 1 个文件（2026-06-12）
+
+**现象：** 前端项目只生成 index.html，CSS/JS 全塞在里面，代码质量差
+
+**修复：** Developer prompt 新增"代码质量要求"：
+- 前端项目必须拆分文件：HTML + CSS + JS 分开
+- 每个文件职责单一
+- 写完后用 execute_python 验证
+
+**测试结果：** 后端 283 + 前端 72 = 355 个全过
+
+---
+
+## Phase 61：Prompt Engineering — 5 Agent 推理策略优化（2026-06-12）
+
+**目标：** 补全四层架构 L2 推理策略层的短板
+
+**设计文档：** `docs/superpowers/specs/2026-06-12-prompt-engineering-design.md`
+
+### 优化内容
+
+| Agent | 之前 | 之后 | 新增内容 |
+|-------|------|------|---------|
+| PM | 957 字，有推理策略 | ~1200 字 | 正负例（计算器拆解 vs 模糊需求）、错误恢复 |
+| Architect | 680 字，有 4 阶段 | ~1000 字 | 推理策略编号、正负例（合理架构 vs 过度设计）、错误恢复 |
+| Developer | 507 字，只有规则 | ~800 字 | 每轮决策框架、正负例（拆分文件 vs 单文件堆砌）、错误恢复 |
+| Tester | 243 字，最薄弱 | ~600 字 | 测试策略、用例设计方法、失败输出示例（与 `_extract_test_passed` 对齐）、错误恢复 |
+| Reviewer | 500 字，有维度 | ~800 字 | 审查流程、正负例、通过标准与路由后果对齐（approved→交付，reject→重做）、错误恢复 |
+
+### 关键改进
+
+**1. Developer 每轮决策框架**（不是一次性输出，是 tool-calling 循环）：
+```
+每轮调用工具前，先想：
+1. 我现在需要什么？（读文件？写文件？验证？）
+2. 这个工具调用能推进任务吗？
+3. 调用后我怎么判断成功/失败？
+```
+
+**2. Tester 失败输出示例**（与 `_extract_test_passed` 解析逻辑对齐）：
+```
+done(summary="2 passed, 1 failed: division(1,0) 返回 None，
+建议在 division 中加 if b==0: raise ValueError('除数不能为零')")
+```
+
+**3. Reviewer 通过标准与路由后果对齐：**
+- `review_approved=true` → 代码进入交付
+- `review_approved=false` → 代码回到 Developer 重做
+- 明确告诉 Reviewer：你的判定直接决定流程走向
+
+**4. 所有 Agent 加错误恢复指引：**
+```
+如果你收到"上一次执行失败"的提示：
+1. 先理解错误原因，不要重复同样的操作
+2. 如果是格式错误，检查 JSON 结构
+3. 如果是逻辑错误，换一种实现方式
+4. 如果是工具调用错误，检查参数是否正确
+```
+
+**测试结果：** 后端 283 + 前端 72 = 355 个全过
