@@ -30,9 +30,10 @@ DEVELOPER_SYSTEM_PROMPT = """你是高级程序员。使用提供的工具来完
 
 ## 工具使用策略
 1. 先用 file_read 了解现有代码（如果有）
-2. 用 file_write 逐个写入文件，一次写一个，不要一次全写完
-3. 用 execute_python 验证代码能运行
-4. 全部完成后用 done 提交
+2. **增量模式**：如果项目目录已有代码文件，先读取理解，只修改/追加需要改的部分，不要从零重写
+3. 用 file_write 逐个写入文件，一次写一个，不要一次全写完
+4. 用 execute_python 验证代码能运行
+5. 全部完成后用 done 提交
 
 ## 代码质量要求
 - 每个函数加简短注释说明用途（1-2 行）
@@ -78,6 +79,13 @@ def build_developer_prompt(state: dict) -> list[dict]:
     iteration = state.get("iteration", 0)
 
     user_content = f"需求：{requirement}\n"
+
+    # 增量模式提示：如果项目目录已有代码文件
+    existing_files = state.get("files", {})
+    if existing_files:
+        file_list = ", ".join(existing_files.keys())
+        user_content += f"\n⚠️ 增量开发模式：项目已有文件 [{file_list}]。请先用 file_read 读取理解现有代码，只修改/追加需要改的部分，不要从零重写所有文件。\n"
+
     if architecture:
         user_content += f"架构：{json.dumps(architecture, ensure_ascii=False)}\n"
     if api_definitions:
