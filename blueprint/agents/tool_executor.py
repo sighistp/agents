@@ -39,6 +39,10 @@ def execute_tool(call, project_dir: str) -> str:
             return _execute_python(args, project_dir)
         elif name == "done":
             return json.dumps({"status": "completed", **args})
+        elif name == "run_linter":
+            if "path" not in args:
+                return json.dumps({"error": "run_linter 缺少 path 参数"})
+            return _run_linter(args, project_dir)
         else:
             return json.dumps({"error": f"未知工具: {name}"})
     except Exception as e:
@@ -160,5 +164,38 @@ def _check_code_safety(code: str):
     for pattern in _DANGEROUS_PATTERNS:
         if pattern in code:
             raise ValueError(f"代码包含不允许的模式: {pattern}")
+
+
+def _run_linter(args: dict, project_dir: str) -> str:
+    """Run ruff linter on a file, return structured results."""
+    path = _resolve_safe_path(args["path"], project_dir)
+    if not os.path.exists(path):
+        return json.dumps({"error": f"文件不存在: {args['path']}"})
+
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["ruff", "check", "--output-format=json", path],
+            capture_output=True, text=True, timeout=15
+        )
+        issues = json.loads(result.stdout) if result.stdout.strip() else []
+        return json.dumps({
+            "issues": [
+                {
+                    "file": i.get("filename", ""),
+                    "line": i.get("location", {}).get("row", 0),
+                    "code": i.get("code", ""),
+                    "message": i.get("message", ""),
+                    "severity": i.get("fix", {}).get("applicability", "error"),
+                }
+                for i in issues
+            ],
+            "score": max(0, 100 - len(issues) * 5),
+            "total": len(issues),
+        })
+    except FileNotFoundError:
+        return json.dumps({"issues": [], "score": 100, "total": 0, "skipped": True, "reason": "ruff not installed"})
+    except Exception as e:
+        return json.dumps({"error": f"linter 失败: {e}"})
 
 

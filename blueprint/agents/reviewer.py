@@ -7,7 +7,7 @@ import json
 import time
 from typing import Any
 
-from blueprint.agents.tools import REVIEWER_TOOLS, serialize_call, get_call_name, get_call_args
+from blueprint.agents.tools import REVIEWER_TOOLS_WITH_LINTER as REVIEWER_TOOLS, serialize_call, get_call_name, get_call_args
 from blueprint.agents.tool_executor import execute_tool
 import asyncio
 from blueprint.utils.llm import call_llm_with_tools_async

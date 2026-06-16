@@ -1,4 +1,4 @@
-﻿"""工具定义：OpenAI function calling 格式"""
+"""工具定义：OpenAI function calling 格式"""
 import json
 from typing import Any
 
@@ -113,6 +113,22 @@ REVIEWER_DONE = {
     }
 }
 REVIEWER_TOOLS = [FILE_READ, REVIEWER_DONE]
+
+RUN_LINTER = {
+    "type": "function",
+    "function": {
+        "name": "run_linter",
+        "description": "运行 ruff 代码检查工具，返回代码质量问题列表。用于审查代码质量。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "要检查的 Python 文件路径"}
+            },
+            "required": ["path"]
+        }
+    }
+}
+REVIEWER_TOOLS_WITH_LINTER = [FILE_READ, REVIEWER_DONE, RUN_LINTER]
 
 
 def get_call_name(call: Any) -> str:

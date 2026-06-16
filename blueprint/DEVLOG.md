@@ -3540,3 +3540,33 @@ deliver_node → 写文件 → meta.json → hook 链:
 | Minor | 6 | 4 ✅ | 2 |
 
 **最终测试：** 后端 358 + 前端 91 = **449 测试全过**
+
+---
+
+## Phase 69：P1 功能 — 单步超时 + SQLite Checkpointer 暂缓（2026-06-16）
+
+### 一、Developer/Tester/Reviewer 单步超时
+
+**问题：** LLM 可能卡住空转，8 步全浪费，用户等很久不知道怎么回事。
+
+**方案：** 每步 LLM 调用加 60 秒超时，超时返回 error 让路由函数处理。
+
+**改动：**
+- `developer.py`：`call_llm_with_tools_async` 外包 `asyncio.wait_for(..., timeout=60)`
+- `tester.py`：同上
+- `reviewer.py`：同上
+
+**测试：** 1 个（mock LLM 返回 TimeoutError → 验证 agent 返回 error）
+**结果：** 359 通过
+
+### 二、MemorySaver → SQLite Checkpointer（暂缓）
+
+**问题：** MemorySaver 进程重启状态全丢。
+
+**尝试：** 安装 `langgraph-checkpoint-sqlite`，改用 `AsyncSqliteSaver`。
+
+**遇到的问题：** `create_graph()` 是同步函数，但 `AsyncSqliteSaver` 需要 async 初始化（`await aiosqlite.connect()`）。同步函数内无法 await，导致 `_GeneratorContextManager` 类型错误。
+
+**决策：** 暂缓。MemorySaver 对 MVP 足够，多实例部署时再做。加了 TODO 注释。
+
+**教训：** LangGraph 的 checkpointer API 设计是 async-first，同步入口函数需要重构才能支持持久化 checkpointer。这是一个架构债务，需要在后续重构 graph.py 时解决。
