@@ -147,8 +147,21 @@ async def developer_agent(state: dict) -> dict[str, Any]:
 
     try:
         for step in range(MAX_STEPS):
-            # 1. Call LLM with tools
-            response = await call_llm_with_tools_async(messages, DEVELOPER_TOOLS)
+            # 1. Call LLM with tools (with per-step timeout)
+            try:
+                response = await asyncio.wait_for(
+                    call_llm_with_tools_async(messages, DEVELOPER_TOOLS),
+                    timeout=60
+                )
+            except asyncio.TimeoutError:
+                return {
+                    "files": files_written,
+                    "iteration": state.get("iteration", 0) + 1,
+                    "key_decisions": key_decisions,
+                    "error": f"Developer 步骤 {step+1} 超时（60秒），LLM 未响应",
+                    "_developer_retry_count": state.get("_developer_retry_count", 0) + 1,
+                    "messages": messages,
+                }
 
             # Build assistant message with tool_calls in OpenAI format
             assistant_msg: dict[str, Any] = {"role": "assistant", "content": response.content or ""}

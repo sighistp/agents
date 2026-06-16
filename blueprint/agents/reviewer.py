@@ -87,7 +87,15 @@ async def reviewer_agent(state: dict) -> dict[str, Any]:
     error = None
 
     for step in range(MAX_STEPS):
-        response = await call_llm_with_tools_async(llm_messages, REVIEWER_TOOLS)
+        try:
+            response = await asyncio.wait_for(
+                call_llm_with_tools_async(llm_messages, REVIEWER_TOOLS),
+                timeout=60
+            )
+        except asyncio.TimeoutError:
+            error = f"Reviewer 步骤 {step+1} 超时（60秒）"
+            collected_review_approved = False
+            break
 
         # No tool calls → implicit done
         if not response.tool_calls:

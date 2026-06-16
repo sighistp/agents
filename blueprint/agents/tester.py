@@ -127,8 +127,21 @@ async def tester_agent(state: dict) -> dict[str, Any]:
         had_execution_errors = False  # Track if any execute_python failed
 
         for step in range(MAX_STEPS):
-            # Call LLM with tools
-            response = await call_llm_with_tools_async(llm_messages, TESTER_TOOLS)
+            # Call LLM with tools (with per-step timeout)
+            try:
+                response = await asyncio.wait_for(
+                    call_llm_with_tools_async(llm_messages, TESTER_TOOLS),
+                    timeout=60
+                )
+            except asyncio.TimeoutError:
+                return {
+                    "test_passed": False,
+                    "test_results": [{"summary": f"Tester 步骤 {step+1} 超时（60秒）", "status": "timeout"}],
+                    "error": f"Tester 步骤 {step+1} 超时（60秒）",
+                    "_tester_retry_count": state.get("_tester_retry_count", 0) + 1,
+                    "messages": messages + [{"role": "assistant", "name": "tester",
+                                              "content": f"测试超时（步骤 {step+1}）"}],
+                }
 
             # Record assistant message
             assistant_msg = {"role": "assistant", "content": response.content or ""}
