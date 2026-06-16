@@ -3570,3 +3570,64 @@ deliver_node → 写文件 → meta.json → hook 链:
 **决策：** 暂缓。MemorySaver 对 MVP 足够，多实例部署时再做。加了 TODO 注释。
 
 **教训：** LangGraph 的 checkpointer API 设计是 async-first，同步入口函数需要重构才能支持持久化 checkpointer。这是一个架构债务，需要在后续重构 graph.py 时解决。
+
+---
+
+## Phase 70：P1 功能续 — Reviewer Linter + 代码注释 + 增量迭代（2026-06-16）
+
+### 一、Reviewer Linter 工具
+
+**问题：** Reviewer 审查深度取决于 LLM prompt，无客观数据。
+
+**方案：** 新增 `run_linter` 工具，调用 ruff 检查 Python 代码质量。
+
+**改动：**
+- `tools.py`：新增 `RUN_LINTER` 工具定义 + `REVIEWER_TOOLS_WITH_LINTER`
+- `tool_executor.py`：新增 `_run_linter` 函数（调用 ruff，返回结构化结果）
+- `reviewer.py`：import 改为 `REVIEWER_TOOLS_WITH_LINTER`
+
+**工具返回格式：**
+```json
+{
+  "issues": [{"file": "app.py", "line": 5, "code": "E302", "message": "expected 2 blank lines"}],
+  "score": 85,
+  "total": 3
+}
+```
+
+**容错：** ruff 未安装时返回 `skipped: true`，不影响 Reviewer 执行。
+
+**测试：** 3 个（结构化结果 / 文件不存在 / ruff 未安装）
+**结果：** 362 通过
+
+### 二、Developer 代码注释要求
+
+**改动：** `DEVELOPER_SYSTEM_PROMPT` 新增「代码质量要求」段落：
+- 每个函数加简短注释
+- 关键逻辑加行内注释
+- 变量命名清晰
+- 常见错误列表新增"代码没有注释"
+
+**结果：** 362 通过
+
+### 三、增量迭代模式
+
+**改动：** `build_developer_prompt` 检测已有文件，注入增量开发提示：
+- 如果项目目录已有文件 → 明确告知"增量开发模式"
+- Developer 先用 file_read 读取理解现有代码
+- 只修改/追加需要改的部分，不从零重写
+
+**结果：** 362 通过
+
+### P1 完成进度
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 单步超时（60s） | ✅ | asyncio.wait_for |
+| MemorySaver → SQLite | ⏸ 暂缓 | 架构债务，需重构 graph.py |
+| Reviewer linter | ✅ | ruff 集成，3 测试 |
+| 代码注释要求 | ✅ | prompt 改动 |
+| 增量迭代模式 | ✅ | prompt 改动 |
+| 一键部署 | ⏸ 暂缓 | 需要外部 API 集成 |
+
+**最终测试：** 362 通过
