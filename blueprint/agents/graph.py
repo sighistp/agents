@@ -536,6 +536,8 @@ def create_graph():
     graph.add_edge("deliver", END)
 
     # Compile with checkpointer for interrupt/resume support
+    # MemorySaver: state in memory, lost on restart
+    # TODO: upgrade to SqliteSaver for persistence when needed
     from langgraph.checkpoint.memory import MemorySaver
     checkpointer = MemorySaver()
 
