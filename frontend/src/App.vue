@@ -1,6 +1,7 @@
 <template>
   <LoadingBar />
   <InterruptDialog />
+  <Toast />
   <div class="app-layout">
     <nav v-if="authStore.isLoggedIn" class="navbar">
       <div class="nav-brand">Blueprint</div>
@@ -30,6 +31,7 @@ import { useWebSocket, setActiveProject } from './composables/useWebSocket.js'
 import LoadingBar from './components/LoadingBar.vue'
 import AgentStatusBar from './components/AgentStatusBar.vue'
 import InterruptDialog from './components/InterruptDialog.vue'
+import Toast from './components/Toast.vue'
 
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
