@@ -52,10 +52,10 @@ const icons = {
   max-width: 360px;
   transition: all 0.3s;
 }
-.toast-success { background: #dcfce7; color: #166534; border-left: 3px solid #16a34a; }
-.toast-error { background: #fee2e2; color: #991b1b; border-left: 3px solid #dc2626; }
-.toast-warning { background: #fef3c7; color: #92400e; border-left: 3px solid #d97706; }
-.toast-info { background: #dbeafe; color: #1e40af; border-left: 3px solid #3b82f6; }
+.toast-success { background: rgba(34,197,94,0.15); color: var(--success); border-left: 3px solid var(--success); }
+.toast-error { background: rgba(239,68,68,0.15); color: var(--error); border-left: 3px solid var(--error); }
+.toast-warning { background: rgba(245,158,11,0.15); color: var(--warning); border-left: 3px solid var(--warning); }
+.toast-info { background: rgba(59,130,246,0.15); color: var(--primary); border-left: 3px solid var(--primary); }
 .toast-enter-active { animation: slideIn 0.3s; }
 .toast-leave-active { animation: slideOut 0.3s; }
 @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

@@ -1,23 +1,84 @@
+/* Blueprint Design System — based on ui-ux-pro-max */
+
+/* ── Light Mode (default) ─────────────────────────────────────────── */
 :root {
   --bg: #FFFFFF;
-  --bg-panel: #F8F9FA;
-  --border: #E5E7EB;
+  --bg-panel: #F8FAFC;
+  --border: #E2E8F0;
   --primary: #3B82F6;
-  --text: #1F2937;
-  --text-dim: #6B7280;
-  --success: #10B981;
-  --error: #EF4444;
-  --warning: #F59E0B;
+  --accent: #22C55E;
+  --text: #0F172A;
+  --text-dim: #64748B;
+  --muted: #F1F5F9;
+  --success: #16A34A;
+  --error: #DC2626;
+  --warning: #D97706;
   --radius: 8px;
   --shadow: 0 1px 3px rgba(0,0,0,0.1);
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-code: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: var(--font); background: var(--bg); color: var(--text); }
+/* ── Dark Mode ────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0F172A;
+    --bg-panel: #1E293B;
+    --border: #334155;
+    --primary: #3B82F6;
+    --accent: #22C55E;
+    --text: #F8FAFC;
+    --text-dim: #94A3B8;
+    --muted: #1E293B;
+    --success: #22C55E;
+    --error: #EF4444;
+    --warning: #F59E0B;
+    --shadow: none;
+  }
+}
 
+/* ── Manual dark class ────────────────────────────────────────────── */
+.dark {
+  --bg: #0F172A;
+  --bg-panel: #1E293B;
+  --border: #334155;
+  --text: #F8FAFC;
+  --text-dim: #94A3B8;
+  --muted: #1E293B;
+  --success: #22C55E;
+  --error: #EF4444;
+  --warning: #F59E0B;
+  --shadow: none;
+}
+
+/* ── Reset & Base ─────────────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* ── Agent Colors ─────────────────────────────────────────────────── */
 .agent-pm { --agent-color: #3B82F6; }
 .agent-architect { --agent-color: #8B5CF6; }
-.agent-developer { --agent-color: #10B981; }
+.agent-developer { --agent-color: #22C55E; }
 .agent-tester { --agent-color: #F59E0B; }
 .agent-reviewer { --agent-color: #EC4899; }
+
+/* ── Responsive Breakpoints ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .flow-panel { display: none; }
+  .app-layout { flex-direction: column; }
+  .chat-panel { width: 100% !important; }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .flow-panel { min-width: 60px; max-width: 60px; }
+  .flow-panel .flow-title,
+  .flow-panel .agents-grid > *:not(.agent-card-icon) { display: none; }
+}
