@@ -80,7 +80,7 @@ const duration = computed(() => null) // 后续从 agentStartTime 计算
 </script>
 
 <style scoped>
-.agent-output-card { border-left: 3px solid; border-radius: 8px; padding: 10px 14px; background: var(--bg-panel); border: 1px solid var(--border); margin: 4px 0; }
+.agent-output-card { border: 1px solid var(--border); border-left: 3px solid; border-radius: 8px; padding: 10px 14px; background: var(--bg-panel); margin: 4px 0; }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .card-agent { font-weight: 600; font-size: 12px; }
 .card-time { font-size: 11px; color: var(--text-dim); }

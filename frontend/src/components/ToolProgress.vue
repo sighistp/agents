@@ -39,29 +39,29 @@ const agentLabel = computed(() => {
 <style scoped>
 .tool-progress {
   padding: 8px 12px;
-  background: #f9fafb;
+  background: var(--bg-panel);
   border-radius: 6px;
   margin-bottom: 8px;
   font-size: 12px;
 }
 .progress-bar {
   height: 4px;
-  background: #e5e7eb;
+  background: var(--border);
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 4px;
 }
 .progress-fill {
   height: 100%;
-  background: #3b82f6;
+  background: var(--primary);
   border-radius: 2px;
   transition: width 0.3s;
 }
 .progress-info {
   display: flex;
   gap: 8px;
-  color: #6b7280;
+  color: var(--text-dim);
 }
-.progress-agent { font-weight: 600; color: #374151; }
-.progress-tool { color: #9ca3af; }
+.progress-agent { font-weight: 600; color: var(--text); }
+.progress-tool { color: var(--text-dim); }
 </style>
