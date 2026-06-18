@@ -3631,3 +3631,59 @@ deliver_node → 写文件 → meta.json → hook 链:
 | 一键部署 | ⏸ 暂缓 | 需要外部 API 集成 |
 
 **最终测试：** 362 通过
+
+---
+
+## Phase 71：前端设计系统 + P0 CSS 修复 + Toast 通知（2026-06-18）
+
+### 一、代码审查（前端）
+
+**来源：** 用户审查前端代码，发现 P0/P1/P2 问题
+
+| 级别 | 问题 | 修复 |
+|------|------|------|
+| P0 | ToolProgress.vue 硬编码颜色（6 处 #xxx） | 改为 CSS 变量 var(--xxx) |
+| P0 | AgentOutputCard border 覆盖 | border 声明顺序修正 |
+| P1 | 无暗色模式 | main.css 添加 @media (prefers-color-scheme: dark) |
+| P1 | 无响应式 | 添加 768px / 1024px 断点 |
+| P1 | 缺 Inter 字体 | index.html 添加 Google Fonts preconnect |
+| P1 | Toast 颜色硬编码 | 改为 CSS 变量（rgba + var()） |
+
+### 二、设计系统（基于 ui-ux-pro-max）
+
+**产品类型：** Developer Tool / IDE
+**风格：** Dark Mode (OLED) + Minimalism
+**字体：** Inter（技术感）+ JetBrains Mono（代码）
+
+| 角色 | 暗色 | 亮色 | 变量 |
+|------|------|------|------|
+| 背景 | #0F172A | #FFFFFF | --bg |
+| 面板 | #1E293B | #F8FAFC | --bg-panel |
+| 强调 | #22C55E | #22C55E | --accent |
+| 主色 | #3B82F6 | #3B82F6 | --primary |
+
+### 三、全局 Toast 通知
+
+**新增文件：**
+- `composables/useNotification.js` — success/error/warning/info + 自动移除
+- `components/Toast.vue` — 固定右上角，滑入滑出，4 种颜色
+- `__tests__/composables/useNotification.test.js` — 5 个测试
+
+**集成：** App.vue 挂载 Toast，全局可用
+
+### 四、项目总结文档
+
+**新增文件：** `Blueprint项目总结.md` — 整合产品设计、功能扩展、代码审查、简历写法
+
+### 五、简历设计
+
+**格式：** 三段式（Agent 设计 / 工程规范），约 400 字
+**核心亮点：** 四层可靠性架构 + 工具调用循环 + Hook 链 + TDD 458 测试
+
+### 测试统计
+
+| 类型 | 数量 |
+|------|------|
+| 后端 | 362 |
+| 前端 | 96 |
+| **合计** | **458** |
