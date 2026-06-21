@@ -1,8 +1,8 @@
 <!-- frontend/src/components/AgentOutputCard.vue -->
 <template>
-  <div class="agent-output-card" :style="{ borderLeftColor: color }">
+  <div class="agent-output-card" :class="colorClass">
     <div class="card-header">
-      <span class="card-agent" :style="{ color }">{{ icon }} {{ label }}</span>
+      <span class="card-agent">{{ icon }} {{ label }}</span>
       <span class="card-time" v-if="duration">{{ duration }}</span>
     </div>
     <div class="card-body">
@@ -69,30 +69,29 @@ const testResults = computed(() => data.value.test_results ?? [])
 const reviewApproved = computed(() => data.value.review_approved ?? false)
 const reviewComments = computed(() => data.value.review_comments ?? [])
 
-const colorMap = { pm: '#3B82F6', architect: '#8B5CF6', developer: '#10B981', tester: '#F59E0B', reviewer: '#EC4899' }
+const colorClass = computed(() => `agent-${props.msg.name || 'default'}`)
 const iconMap = { pm: '👤', architect: '🏗️', developer: '💻', tester: '🧪', reviewer: '🔍' }
 const labelMap = { pm: 'PM', architect: '架构师', developer: '开发者', tester: '测试员', reviewer: '审查员' }
 
-const color = computed(() => colorMap[props.msg.name] || '#6B7280')
 const icon = computed(() => iconMap[props.msg.name] || '🤖')
 const label = computed(() => labelMap[props.msg.name] || props.msg.name)
-const duration = computed(() => null) // 后续从 agentStartTime 计算
+const duration = computed(() => null)
 </script>
 
 <style scoped>
-.agent-output-card { border: 1px solid var(--border); border-left: 3px solid; border-radius: 8px; padding: 10px 14px; background: var(--bg-panel); margin: 4px 0; }
+.agent-output-card { border: 1px solid var(--border); border-left: 3px solid var(--agent-color, var(--text-dim)); border-radius: 8px; padding: 10px 14px; background: var(--bg-panel); margin: 4px 0; }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.card-agent { font-weight: 600; font-size: 12px; }
+.card-agent { font-weight: 600; font-size: 12px; color: var(--agent-color, var(--text-dim)); }
 .card-time { font-size: 11px; color: var(--text-dim); }
 .card-body { font-size: 12px; color: var(--text); line-height: 1.6; }
 .file-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .file-tag { background: var(--bg); padding: 2px 8px; border-radius: 4px; font-size: 11px; }
 .decisions { margin-top: 4px; }
 .decision-tag { display: inline-block; margin-right: 8px; font-size: 11px; }
-.test-pass { color: #10B981; } .test-fail { color: #EF4444; }
-.review-pass { color: #10B981; } .review-fail { color: #EF4444; }
+.test-pass { color: var(--success); } .test-fail { color: var(--error); }
+.review-pass { color: var(--success); } .review-fail { color: var(--error); }
 .review-comment { font-size: 11px; margin-top: 2px; }
 .severity { font-weight: 600; margin-right: 4px; }
-.severity.critical { color: #EF4444; } .severity.important { color: #F59E0B; } .severity.minor { color: #6B7280; }
+.severity.critical { color: var(--error); } .severity.important { color: var(--warning); } .severity.minor { color: var(--text-dim); }
 .test-summary { font-size: 11px; margin-top: 2px; }
 </style>

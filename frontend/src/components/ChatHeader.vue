@@ -41,12 +41,14 @@ defineEmits(['pause', 'resume', 'stop', 'save', 'clear', 'new'])
 .chat-actions { display: flex; gap: 6px; }
 .btn-icon { width: 28px; height: 28px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; transition: all 0.15s; }
 .btn-icon:hover { background: var(--bg-panel); border-color: var(--primary); color: var(--primary); }
-.btn-pause { color: #ff9800; border-color: #ff980044; }
-.btn-pause:hover { background: #fff8f0; border-color: #ff9800; }
-.btn-resume { color: #4caf50; border-color: #4caf5044; }
-.btn-resume:hover { background: #f0fff0; border-color: #4caf50; }
-.btn-stop { color: #e74c3c; border-color: #e74c3c44; }
-.btn-stop:hover { background: #ffeaea; border-color: #e74c3c; }
+.btn-pause { color: var(--warning); border-color: rgba(245,158,11,0.3); }
+.btn-pause:hover { background: rgba(245,158,11,0.1); border-color: var(--warning); }
+
+.btn-resume { color: var(--success); border-color: rgba(34,197,94,0.3); }
+.btn-resume:hover { background: rgba(34,197,94,0.1); border-color: var(--success); }
+
+.btn-stop { color: var(--error); border-color: rgba(239,68,68,0.3); }
+.btn-stop:hover { background: rgba(239,68,68,0.1); border-color: var(--error); }
 .disconnect-hint { font-size: 12px; color: #EF4444; font-weight: 500; margin-right: 4px; }
 .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-icon:disabled:hover { background: transparent; border-color: var(--border); color: var(--text-dim); }

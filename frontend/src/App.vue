@@ -12,6 +12,9 @@
       </div>
       <AgentStatusBar />
       <div class="nav-user">
+        <button class="theme-toggle" @click="themeStore.toggle()" :title="themeStore.isDark ? '切换亮色模式' : '切换暗色模式'">
+          {{ themeStore.isDark ? '☀️' : '🌙' }}
+        </button>
         <span>{{ authStore.username }}</span>
         <button @click="logout">退出</button>
       </div>
@@ -27,6 +30,7 @@ import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth.js'
 import { useProjectStore } from './stores/project.js'
+import { useThemeStore } from './stores/theme.js'
 import { useWebSocket, setActiveProject } from './composables/useWebSocket.js'
 import LoadingBar from './components/LoadingBar.vue'
 import AgentStatusBar from './components/AgentStatusBar.vue'
@@ -35,10 +39,12 @@ import Toast from './components/Toast.vue'
 
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
+const themeStore = useThemeStore()
 const router = useRouter()
 const { connect, disconnect } = useWebSocket()
 
 onMounted(async () => {
+  themeStore.init()
   if (authStore.isLoggedIn) {
     connect()
     // 同步后端设置到前端（maxIterations 等）
@@ -77,5 +83,6 @@ function logout() {
 .nav-links a.router-link-active { color: var(--primary); }
 .nav-user { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-dim); }
 .nav-user button { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 12px; cursor: pointer; font-size: 12px; }
+.theme-toggle { padding: 4px 8px !important; font-size: 16px !important; }
 .main-content { flex: 1; }
 </style>

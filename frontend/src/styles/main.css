@@ -34,6 +34,10 @@
     --error: #EF4444;
     --warning: #F59E0B;
     --shadow: none;
+    --success-bg: rgba(34,197,94,0.2);
+    --error-bg: rgba(239,68,68,0.2);
+    --warning-bg: rgba(245,158,11,0.2);
+    --info-bg: rgba(59,130,246,0.2);
   }
 }
 
@@ -49,6 +53,10 @@
   --error: #EF4444;
   --warning: #F59E0B;
   --shadow: none;
+  --success-bg: rgba(34,197,94,0.2);
+  --error-bg: rgba(239,68,68,0.2);
+  --warning-bg: rgba(245,158,11,0.2);
+  --info-bg: rgba(59,130,246,0.2);
 }
 
 /* ── Reset & Base ─────────────────────────────────────────────────── */
@@ -71,14 +79,26 @@ body {
 .agent-reviewer { --agent-color: #EC4899; }
 
 /* ── Responsive Breakpoints ───────────────────────────────────────── */
+.flow-panel { flex-shrink: 0; }
+.chat-panel { flex: 1; min-width: 0; }
+
 @media (max-width: 768px) {
   .flow-panel { display: none; }
   .app-layout { flex-direction: column; }
-  .chat-panel { width: 100% !important; }
 }
 
 @media (min-width: 768px) and (max-width: 1024px) {
   .flow-panel { min-width: 60px; max-width: 60px; }
   .flow-panel .flow-title,
   .flow-panel .agents-grid > *:not(.agent-card-icon) { display: none; }
+}
+
+/* ── Reduced Motion ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  body { transition: none; }
 }

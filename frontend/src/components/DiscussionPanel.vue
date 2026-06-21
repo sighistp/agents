@@ -31,7 +31,7 @@ const discussionMessages = computed(() =>
 .discussion-title span { font-size: 12px; color: var(--primary); font-weight: 400; }
 .discussion-body { padding: 0 16px 16px; }
 .disc-item { padding: 8px 12px; margin-bottom: 8px; border-radius: 6px; font-size: 12px; line-height: 1.5; }
-.disc-item.proposer { background: #EFF6FF; border-left: 3px solid var(--primary); }
-.disc-item.critic { background: #FFF1F2; border-left: 3px solid var(--error); }
+.disc-item.proposer { background: rgba(59,130,246,0.1); border-left: 3px solid var(--primary); }
+.disc-item.critic { background: rgba(239,68,68,0.1); border-left: 3px solid var(--error); }
 .disc-label { font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--text-dim); }
 </style>
