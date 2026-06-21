@@ -1,15 +1,7 @@
 <template>
   <div class="card">
     <div class="card-title">📋 项目信息</div>
-    <div v-if="loading" class="skeleton-inner">
-      <div class="skeleton-bar skeleton-title"></div>
-      <div class="skeleton-bar" v-for="n in 3" :key="n"></div>
-    </div>
-    <div v-else-if="error" class="error-inner">
-      <div class="error-text">{{ error }}</div>
-      <button class="btn-retry" @click="load">重试</button>
-    </div>
-    <template v-else-if="state">
+    <template v-if="state">
       <div class="info-grid">
         <div class="info-item">
           <span class="info-label">名称</span>
@@ -37,14 +29,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { api } from '../../api/index.js'
+import { computed } from 'vue'
 
-const props = defineProps({ projectId: { type: String, required: true } })
+const props = defineProps({
+  projectId: { type: String, required: true },
+  projectData: { type: Object, default: null }
+})
 
-const loading = ref(true)
-const error = ref(null)
-const state = ref(null)
+const state = computed(() => props.projectData)
 
 const statusClass = computed(() => {
   const s = state.value?.status
@@ -54,22 +46,6 @@ const statusClass = computed(() => {
   if (s === 'running') return 'status-running'
   return ''
 })
-
-async function load() {
-  loading.value = true
-  error.value = null
-  try {
-    state.value = await api.getProjectState(props.projectId)
-  } catch (e) {
-    error.value = e.message || '加载失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-defineExpose({ load, state })
-
-onMounted(load)
 </script>
 
 <style scoped>

@@ -27,14 +27,14 @@
 
     <!-- Tab Content -->
     <template v-else-if="state">
-      <div class="tab-bar">
-        <button v-for="t in tabs" :key="t.key" class="tab-btn" :class="{ active: activeTab === t.key }" @click="activeTab = activeTab === t.key ? '' : t.key">
+      <div class="tab-bar" role="tablist">
+        <button v-for="t in tabs" :key="t.key" class="tab-btn" :class="{ active: activeTab === t.key }" role="tab" :aria-selected="activeTab === t.key" @click="activeTab = activeTab === t.key ? '' : t.key">
           {{ t.icon }} {{ t.label }}
         </button>
       </div>
-      <div class="tab-panel">
-        <ProjectInfoCard v-if="activeTab === 'info'" ref="infoRef" :projectId="projectId" />
-        <ProjectFilesPanel v-if="activeTab === 'files'" ref="filesRef" :projectId="projectId" />
+      <div class="tab-panel" role="tabpanel">
+        <ProjectInfoCard v-if="activeTab === 'info'" :projectData="state" />
+        <ProjectFilesPanel v-if="activeTab === 'files'" :projectData="state" />
         <ProjectLogPanel v-if="activeTab === 'log'" :projectId="projectId" />
         <QualityScore v-if="activeTab === 'quality'" :projectId="projectId" />
         <SecurityReport v-if="activeTab === 'security'" :projectId="projectId" />
@@ -96,8 +96,6 @@ const editText = ref('')
 const rerunDialogVisible = ref(false)
 
 const activeTab = ref('info')
-const infoRef = ref(null)
-const filesRef = ref(null)
 
 const tabs = [
   { key: 'info', icon: '📋', label: '项目信息' },

@@ -1,14 +1,7 @@
 <template>
   <div class="card">
     <div class="card-title">📁 生成文件</div>
-    <div v-if="loading" class="skeleton-inner">
-      <div class="skeleton-bar" v-for="n in 3" :key="n"></div>
-    </div>
-    <div v-else-if="error" class="error-inner">
-      <div class="error-text">{{ error }}</div>
-      <button class="btn-retry" @click="load">重试</button>
-    </div>
-    <template v-else>
+    <template>
       <template v-if="fileList.length > 0">
         <div class="files-list">
           <div v-for="f in fileList" :key="f.path" class="file-item">
@@ -37,16 +30,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { saveAs } from 'file-saver'
-import { api } from '../../api/index.js'
 import { useFilePreview } from '../../composables/useFilePreview.js'
 
-const props = defineProps({ projectId: { type: String, required: true } })
+const props = defineProps({
+  projectId: { type: String, required: true },
+  projectData: { type: Object, default: null }
+})
 
-const loading = ref(true)
-const error = ref(null)
-const files = ref({})
+const files = computed(() => props.projectData?.files || {})
 
 const { previewFile, previewContent, highlightedContent, openPreview, closePreview, copyContent } = useFilePreview()
 
@@ -77,23 +70,6 @@ function downloadSingle(path, content) {
   const blob = new Blob([content], { type: 'text/plain' })
   saveAs(blob, path.split('/').pop())
 }
-
-async function load() {
-  loading.value = true
-  error.value = null
-  try {
-    const state = await api.getProjectState(props.projectId)
-    files.value = state.files || {}
-  } catch (e) {
-    error.value = e.message || '加载失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-defineExpose({ load })
-
-onMounted(load)
 </script>
 
 <style scoped>
