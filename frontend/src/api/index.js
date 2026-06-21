@@ -32,10 +32,16 @@ export const api = {
   getProjectState: (id) => request(`/projects/${id}/state`),
   deleteProject: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
   getProjectFiles: (id) => request(`/projects/${id}/files`),
-  downloadProject: (id) => `/api/projects/${id}/download`,
+  downloadProject: (id) => {
+    const token = localStorage.getItem('token')
+    window.open(`${BASE}/projects/${id}/download${token ? '?token=' + token : ''}`, '_blank')
+  },
   getProjectConversations: (id) => request(`/projects/${id}/conversations`),
   getProjectExecutions: (id) => request(`/projects/${id}/executions`),
-  exportProject: (id) => `/api/projects/${id}/export`,
+  exportProject: (id) => {
+    const token = localStorage.getItem('token')
+    window.open(`${BASE}/projects/${id}/export${token ? '?token=' + token : ''}`, '_blank')
+  },
   getQualityScore: (id) => request(`/projects/${id}/quality`),
   getSecurityReport: (id) => request(`/projects/${id}/security`),
   getDiff: (id, a, b) => request(`/projects/${id}/diff?a=${a}&b=${b}`),
@@ -46,4 +52,13 @@ export const api = {
     if (iteration != null) params.set('iteration', iteration)
     return request(`/projects/${id}/traces?${params}`)
   },
+  // Presets
+  getPresets: () => request('/settings/presets'),
+  savePreset: (name) => request('/settings/presets', { method: 'POST', body: JSON.stringify({ name }) }),
+  applyPreset: (name) => request(`/settings/presets/${name}/apply`, { method: 'POST' }),
+  deletePreset: (name) => request(`/settings/presets/${name}`, { method: 'DELETE' }),
+  // Webhooks
+  getWebhooks: () => request('/settings/webhooks'),
+  addWebhook: (data) => request('/settings/webhooks', { method: 'POST', body: JSON.stringify(data) }),
+  deleteWebhook: (index) => request(`/settings/webhooks/${index}`, { method: 'DELETE' }),
 }

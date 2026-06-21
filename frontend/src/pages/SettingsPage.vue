@@ -76,10 +76,7 @@ onMounted(async () => {
 
 async function loadPresets() {
   try {
-    const res = await fetch('/api/settings/presets', {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    })
-    if (res.ok) presets.value = await res.json()
+    presets.value = await api.getPresets()
   } catch {}
 }
 
@@ -97,14 +94,7 @@ async function save() {
 async function savePreset() {
   if (!newPresetName.value) return
   try {
-    await fetch('/api/settings/presets', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ name: newPresetName.value })
-    })
+    await api.savePreset(newPresetName.value)
     message.value = `预设 "${newPresetName.value}" 已保存`; success.value = true
     newPresetName.value = ''
     loadPresets()
@@ -114,25 +104,17 @@ async function savePreset() {
 async function applyPreset() {
   if (!selectedPreset.value) return
   try {
-    const res = await fetch(`/api/settings/presets/${selectedPreset.value}/apply`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    })
-    if (res.ok) {
-      const data = await api.getSettings()
-      form.value = { ...form.value, ...data }
-      message.value = `已切换到 "${selectedPreset.value}"`; success.value = true
-    }
+    await api.applyPreset(selectedPreset.value)
+    const data = await api.getSettings()
+    form.value = { ...form.value, ...data }
+    message.value = `已切换到 "${selectedPreset.value}"`; success.value = true
   } catch (e) { message.value = e.message; success.value = false }
 }
 
 async function deletePreset() {
   if (!selectedPreset.value) return
   try {
-    await fetch(`/api/settings/presets/${selectedPreset.value}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    })
+    await api.deletePreset(selectedPreset.value)
     message.value = `预设 "${selectedPreset.value}" 已删除`; success.value = true
     selectedPreset.value = ''
     loadPresets()
