@@ -31,6 +31,7 @@ router = APIRouter()
 
 # Rate limiting: max 3 start_project per minute per user
 _rate_limits: dict[str, list[float]] = defaultdict(list)
+_rate_limits_lock = threading.Lock()
 _RATE_LIMIT_MAX = 3
 _RATE_LIMIT_WINDOW = 60  # seconds
 _last_cleanup = 0.0
@@ -41,20 +42,21 @@ def _check_rate_limit(user_id: str) -> bool:
     global _last_cleanup
     now = time.time()
 
-    # Periodic cleanup: remove stale entries every 5 minutes
-    if now - _last_cleanup > 300:
-        _last_cleanup = now
-        stale_keys = [k for k, v in _rate_limits.items()
-                      if all(now - t > _RATE_LIMIT_WINDOW for t in v)]
-        for k in stale_keys:
-            del _rate_limits[k]
+    with _rate_limits_lock:
+        # Periodic cleanup: remove stale entries every 5 minutes
+        if now - _last_cleanup > 300:
+            _last_cleanup = now
+            stale_keys = [k for k, v in _rate_limits.items()
+                          if all(now - t > _RATE_LIMIT_WINDOW for t in v)]
+            for k in stale_keys:
+                del _rate_limits[k]
 
-    timestamps = _rate_limits[user_id]
-    timestamps[:] = [t for t in timestamps if now - t < _RATE_LIMIT_WINDOW]
-    if len(timestamps) >= _RATE_LIMIT_MAX:
-        return False
-    timestamps.append(now)
-    return True
+        timestamps = _rate_limits[user_id]
+        timestamps[:] = [t for t in timestamps if now - t < _RATE_LIMIT_WINDOW]
+        if len(timestamps) >= _RATE_LIMIT_MAX:
+            return False
+        timestamps.append(now)
+        return True
 
 
 def _extract_agent_summary(node_name: str, node_output: dict) -> str:

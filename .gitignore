@@ -52,6 +52,9 @@ blueprint/static/icons.svg
 blueprint/data/settings.json
 blueprint/data/api_presets.json
 .blueprint_secret
+.BLUEPRINT_secret
+.devteam_secret
+*.secret
 
 # Projects (generated output)
 blueprint/projects/
