@@ -3722,3 +3722,90 @@ deliver_node → 写文件 → meta.json → hook 链:
 - 后端 362 通过
 - 前端 96 通过
 - **合计 458**
+
+---
+
+## Phase 73：ProjectDetailPage 拆分（2026-06-19）
+
+**目标：** 将 802 行大组件拆分为 Tab 架构 + 独立子组件
+
+### 拆分结果
+
+| 文件 | 之前 | 之后 | 说明 |
+|------|------|------|------|
+| ProjectDetailPage.vue | 802 行 | 195 行 | Tab 容器 + 页面头 + 对话框 |
+| ProjectInfoCard.vue | — | 139 行 | 项目信息卡片（新增） |
+| ProjectFilesPanel.vue | — | 178 行 | 文件面板（新增） |
+| ProjectLogPanel.vue | — | 225 行 | 开发日志（新增） |
+
+### 设计决策
+
+- 父组件加载 state 并通过 prop 传给子组件（消除重复 API 调用）
+- 子组件独立管理自己的加载/错误状态
+- Tab 切换用 v-if（销毁重建，简单可靠）
+- 已有组件（QualityScore/SecurityReport/DiffViewer/AgentTracePanel）直接复用
+
+### 代码审查修复（2 轮）
+
+**第一轮（1 Critical + 6 Important）：**
+- C1: AgentOutputCard 硬编码颜色 → CSS 变量
+- I1: Toast 暗色模式背景 → rgba 透明度
+- I2: 无 prefers-reduced-motion → 添加
+- I3: !important → flex-shrink: 0
+- I4: ChatHeader Material 颜色 → CSS 变量
+- I5: DiscussionPanel 浅色背景 → rgba
+- I6: 无手动切换 → theme.js store + 按钮
+
+**第二轮（4 Important + 3 Minor）：**
+- I1: 重复 API 调用 → 父组件传 prop
+- I2: 未使用 refs → 删除
+- I3: 3 个新组件无测试 → 补充 5 个测试
+- I4: Tab 缺少 aria 角色 → 加 role/aria-selected
+
+---
+
+## Phase 74：全线代码审查 + 硬编码颜色批量修复（2026-06-19）
+
+**来源：** requesting-code-review 全项目审查
+
+### 后端审查结果
+
+| 级别 | 数量 | 关键问题 |
+|------|------|---------|
+| Critical | 5 | .BLUEPRINT_secret 不在 gitignore、无 CORS、settings.json 明文 API key、SQL 动态拼接、限流器无线程锁 |
+| Important | 7 | developer.py TraceDB 重复 4 次、reviewer.py 重复变量、requirements.txt 不完整等 |
+| Minor | 6 | 运算符优先级、硬编码延迟、MAX_STEPS 不一致等 |
+
+### 前端审查结果
+
+| 问题 | 数量 |
+|------|------|
+| 硬编码 CSS 颜色 | ~40 处（18 个文件） |
+| JS 硬编码颜色 | 3 处（IterationInfo/ChatPanel） |
+| Store 反模式 | 5 个 |
+| API 错误处理缺失 | 6 个 |
+| Emoji 做图标 | ~60 处（后续处理） |
+
+### 已修复
+
+| 修复 | 数量 |
+|------|------|
+| CSS 硬编码 → 变量 | ~40 处（18 个文件） |
+| IterationInfo JS → CSS 类 | 3 处 |
+| main.css 新增变量 | 5 个（--success-bg 等） |
+
+### 待修复（按优先级）
+
+| 优先级 | 问题 |
+|--------|------|
+| 1 | ChatPanel JS colorMap（需改模板绑定） |
+| 2 | Store 反模式（websocket.js 状态封装） |
+| 3 | API 错误处理（downloadProject 无 auth） |
+| 4 | 60+ emoji 图标（需引入 Lucide Icons） |
+| 5 | 组件超 200 行（ChatPanel/ProjectLogPanel 拆分） |
+
+### 测试
+
+- 后端 362 通过
+- 前端 101 通过
+- **合计 463**
