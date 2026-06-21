@@ -3687,3 +3687,38 @@ deliver_node → 写文件 → meta.json → hook 链:
 | 后端 | 362 |
 | 前端 | 96 |
 | **合计** | **458** |
+
+---
+
+## Phase 72：代码审查修复（2026-06-19）
+
+**来源：** requesting-code-review 子代理审查，发现 1 Critical + 6 Important
+
+### Critical 修复（1/1 ✅）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| C1 | AgentOutputCard.vue P0 修复不完整，style 仍有 7 处硬编码 hex，JS colorMap 有 5 处 | 改为 CSS 变量 colorClass + var(--agent-color)，移除 JS colorMap |
+
+### Important 修复（6/6 ✅）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| I1 | Toast 暗色模式背景洗白 | 新增 --success-bg/--error-bg/--warning-bg/--info-bg 变量 |
+| I2 | 无 prefers-reduced-motion | main.css 添加 `@media (prefers-reduced-motion: reduce)` |
+| I3 | !important 在响应式断点 | 改用 flex-shrink: 0 + min-width: 0 |
+| I4 | ChatHeader Material Design 颜色 | 改为 var(--warning/--success/--error) |
+| I5 | DiscussionPanel 浅色背景暗色失效 | 改为 rgba(0.1) 透明度 |
+| I6 | 无手动暗色/亮色切换 | 新增 theme.js store + 导航栏切换按钮 |
+
+### 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `stores/theme.js` | 暗色/亮色模式管理（system/light/dark） |
+
+### 测试
+
+- 后端 362 通过
+- 前端 96 通过
+- **合计 458**
