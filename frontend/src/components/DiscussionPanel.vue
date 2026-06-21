@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="discussionMessages.length > 0" class="discussion-panel">
     <div class="discussion-title" @click="expanded = !expanded">
       💬 Proposer-Critic 讨论 ({{ discussionMessages.length }} 条)

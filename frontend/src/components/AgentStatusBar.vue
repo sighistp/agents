@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="hasActiveProject" class="status-bar">
     <div v-for="agent in projectStore.agentList" :key="agent.name" :class="['status-dot', agent.status]" :title="`${agent.name}: ${agent.status}`"></div>
     <span class="status-text">{{ statusText }}</span>

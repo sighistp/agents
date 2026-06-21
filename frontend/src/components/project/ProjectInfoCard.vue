@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="card">
     <div class="card-title">📋 项目信息</div>
     <template v-if="state">
@@ -74,9 +74,9 @@ const statusClass = computed(() => {
 .info-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
 .info-value { font-size: 14px; font-weight: 500; }
 .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; width: fit-content; }
-.status-good { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-.status-bad { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
-.status-running { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.status-good { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.status-bad { background: rgba(239, 68, 68, 0.15); color: var(--error); }
+.status-running { background: rgba(59, 130, 246, 0.15); color: var(--primary); }
 .info-requirement { margin-top: 8px; }
 .requirement-text {
   margin-top: 4px;
@@ -101,7 +101,7 @@ const statusClass = computed(() => {
 .skeleton-title { width: 40%; height: 18px; }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .error-inner { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-.error-text { color: #ef4444; font-size: 13px; }
+.error-text { color: var(--error); font-size: 13px; }
 .btn-retry {
   font-size: 12px;
   padding: 4px 12px;

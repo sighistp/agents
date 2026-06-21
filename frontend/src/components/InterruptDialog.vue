@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="projectStore.interrupt" class="overlay">
     <div class="dialog">
       <h3>{{ projectStore.interrupt.type === 'clarify' ? '需要补充信息' : '需要确认' }}</h3>

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="agent-trace-panel">
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
@@ -72,7 +72,7 @@ onMounted(load)
 <style scoped>
 .agent-trace-panel { padding: 4px 0; }
 .loading, .error, .empty { font-size: 13px; color: var(--text-dim); padding: 16px 0; text-align: center; }
-.error { color: #ef4444; }
+.error { color: var(--error); }
 .trace-item { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
 .trace-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; user-select: none; background: var(--bg); }
 .trace-header:hover { background: var(--bg-panel); }
@@ -85,5 +85,5 @@ onMounted(load)
 .section-label { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 .section-content { font-size: 13px; white-space: pre-wrap; word-break: break-word; line-height: 1.6; padding: 8px 12px; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); }
 .tools-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.tool-tag { font-size: 11px; padding: 2px 8px; background: rgba(59,130,246,0.15); color: #3b82f6; border-radius: 4px; font-family: monospace; }
+.tool-tag { font-size: 11px; padding: 2px 8px; background: rgba(59,130,246,0.15); color: var(--primary); border-radius: 4px; font-family: monospace; }
 </style>

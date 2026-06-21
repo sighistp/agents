@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="tool-progress" v-if="progress">
     <div class="progress-bar">
       <div class="progress-fill" :style="{ width: progressPct + '%' }"></div>

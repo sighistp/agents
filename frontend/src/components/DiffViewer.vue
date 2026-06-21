@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="diff-viewer">
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
@@ -84,7 +84,7 @@ onMounted(loadSnapshots)
 <style scoped>
 .diff-viewer { padding: 4px 0; }
 .loading, .error, .empty { font-size: 13px; color: var(--text-dim); padding: 16px 0; text-align: center; }
-.error { color: #ef4444; }
+.error { color: var(--error); }
 .diff-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .diff-select { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 13px; }
 .diff-select:focus { outline: none; border-color: var(--primary); }
@@ -94,11 +94,11 @@ onMounted(loadSnapshots)
 .file-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 13px; }
 .file-path { font-family: monospace; font-weight: 500; }
 .file-type { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
-.type-added { background: rgba(34,197,94,0.15); color: #22c55e; }
-.type-modified { background: rgba(59,130,246,0.15); color: #3b82f6; }
-.type-deleted { background: rgba(239,68,68,0.15); color: #ef4444; }
+.type-added { background: rgba(34,197,94,0.15); color: var(--success); }
+.type-modified { background: rgba(59,130,246,0.15); color: var(--primary); }
+.type-deleted { background: rgba(239,68,68,0.15); color: var(--error); }
 .diff-lines { font-family: monospace; font-size: 12px; }
 .diff-line { padding: 2px 16px; white-space: pre; line-height: 1.6; }
-.diff-add { background: rgba(34,197,94,0.1); color: #22c55e; }
-.diff-del { background: rgba(239,68,68,0.1); color: #ef4444; }
+.diff-add { background: rgba(34,197,94,0.1); color: var(--success); }
+.diff-del { background: rgba(239,68,68,0.1); color: var(--error); }
 </style>

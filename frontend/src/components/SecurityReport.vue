@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="security-report">
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
@@ -56,20 +56,20 @@ onMounted(load)
 <style scoped>
 .security-report { padding: 4px 0; }
 .loading, .error { font-size: 13px; color: var(--text-dim); padding: 16px 0; text-align: center; }
-.error { color: #ef4444; }
+.error { color: var(--error); }
 .score-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .score-label { font-size: 13px; color: var(--text-dim); }
 .score-val { font-size: 28px; font-weight: 700; }
-.score-green { color: #22c55e; }
+.score-green { color: var(--success); }
 .score-yellow { color: #eab308; }
-.score-red { color: #ef4444; }
+.score-red { color: var(--error); }
 .issues { display: flex; flex-direction: column; gap: 8px; }
 .issue-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; }
 .severity-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; flex-shrink: 0; }
-.severity-critical { background: rgba(239,68,68,0.15); color: #ef4444; }
+.severity-critical { background: rgba(239,68,68,0.15); color: var(--error); }
 .severity-high { background: rgba(249,115,22,0.15); color: #f97316; }
 .severity-medium { background: rgba(234,179,8,0.15); color: #eab308; }
-.severity-low { background: rgba(34,197,94,0.15); color: #22c55e; }
+.severity-low { background: rgba(34,197,94,0.15); color: var(--success); }
 .issue-loc { font-family: monospace; color: var(--text-dim); flex-shrink: 0; }
 .issue-desc { flex: 1; min-width: 0; }
 .empty { font-size: 13px; color: var(--text-dim); padding: 16px 0; text-align: center; }

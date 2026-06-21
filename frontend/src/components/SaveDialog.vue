@@ -1,4 +1,4 @@
-<!-- frontend/src/components/SaveDialog.vue -->
+﻿<!-- frontend/src/components/SaveDialog.vue -->
 <template>
   <div v-if="visible" class="save-overlay" @click.self="cancel">
     <div class="save-dialog">
@@ -55,7 +55,7 @@ function cancel() { emit('update:visible', false) }
 .dialog-label { font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
 .dialog-input { width: 100%; border: 2px solid var(--primary); border-radius: 8px; padding: 10px 14px; font-size: 14px; box-sizing: border-box; outline: none; }
 .dialog-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
-.dialog-error { font-size: 12px; color: #EF4444; margin-top: 8px; }
+.dialog-error { font-size: 12px; color: var(--error); margin-top: 8px; }
 .dialog-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
 .btn-cancel { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 20px; cursor: pointer; font-size: 13px; }
 .btn-confirm { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 8px 20px; cursor: pointer; font-size: 13px; }

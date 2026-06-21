@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="flow-panel">
     <ToolProgress v-if="projectStore.toolProgress" :progress="projectStore.toolProgress" />
     <div class="flow-title">Agent 协作流程</div>

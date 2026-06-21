@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="chat-panel">
     <ChatHeader
       @pause="send({ type: 'pause' })"

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="log-panel">
     <!-- Conversations -->
     <div class="card">
@@ -190,15 +190,15 @@ function toggleExecutions() {
 .exec-item { display: flex; gap: 12px; padding: 12px 0; position: relative; }
 .exec-item:not(:last-child) { border-bottom: 1px solid var(--border); }
 .exec-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-.dot-success { background: #22c55e; }
-.dot-other { background: #ef4444; }
+.dot-success { background: var(--success); }
+.dot-other { background: var(--error); }
 .exec-body { flex: 1; min-width: 0; }
 .exec-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 .exec-agent { font-size: 13px; font-weight: 600; color: var(--primary); }
 .exec-iter { font-size: 11px; color: var(--text-dim); }
 .exec-status { font-size: 11px; padding: 1px 6px; border-radius: 3px; }
-.status-success { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-.status-other { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.status-success { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.status-other { background: rgba(239, 68, 68, 0.15); color: var(--error); }
 .exec-time { font-size: 11px; color: var(--text-dim); margin-left: auto; }
 .exec-summary { font-size: 13px; line-height: 1.5; }
 .skeleton-inner { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
@@ -211,7 +211,7 @@ function toggleExecutions() {
 }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .error-inner { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-.error-text { color: #ef4444; font-size: 13px; }
+.error-text { color: var(--error); font-size: 13px; }
 .btn-retry {
   font-size: 12px;
   padding: 4px 12px;

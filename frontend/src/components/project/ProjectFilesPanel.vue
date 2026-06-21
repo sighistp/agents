@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="card">
     <div class="card-title">📁 生成文件</div>
     <template>
@@ -139,7 +139,7 @@ function downloadSingle(path, content) {
 }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .error-inner { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
-.error-text { color: #ef4444; font-size: 13px; }
+.error-text { color: var(--error); font-size: 13px; }
 .btn-retry {
   font-size: 12px;
   padding: 4px 12px;

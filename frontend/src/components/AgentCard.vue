@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div :class="['agent-card', `agent-${name}`, status]" @click="toggleExpand">
     <div class="agent-bar"></div>
     <div class="agent-body">

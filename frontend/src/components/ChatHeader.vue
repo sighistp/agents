@@ -1,4 +1,4 @@
-<!-- frontend/src/components/ChatHeader.vue -->
+﻿<!-- frontend/src/components/ChatHeader.vue -->
 <template>
   <div class="chat-header">
     <span class="chat-title">通讯频道</span>
@@ -49,7 +49,7 @@ defineEmits(['pause', 'resume', 'stop', 'save', 'clear', 'new'])
 
 .btn-stop { color: var(--error); border-color: rgba(239,68,68,0.3); }
 .btn-stop:hover { background: rgba(239,68,68,0.1); border-color: var(--error); }
-.disconnect-hint { font-size: 12px; color: #EF4444; font-weight: 500; margin-right: 4px; }
+.disconnect-hint { font-size: 12px; color: var(--error); font-weight: 500; margin-right: 4px; }
 .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-icon:disabled:hover { background: transparent; border-color: var(--border); color: var(--text-dim); }
 </style>

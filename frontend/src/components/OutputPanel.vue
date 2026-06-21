@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="Object.keys(projectStore.files).length > 0" class="output-panel">
     <div class="output-title">生成文件</div>
     <div v-for="(content, path) in projectStore.files" :key="path" class="file-item">

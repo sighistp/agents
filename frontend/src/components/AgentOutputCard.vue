@@ -1,4 +1,4 @@
-<!-- frontend/src/components/AgentOutputCard.vue -->
+﻿<!-- frontend/src/components/AgentOutputCard.vue -->
 <template>
   <div class="agent-output-card" :class="colorClass">
     <div class="card-header">

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="wsStore.reconnecting" class="reconnect-bar">
     连接断开，正在重连...
   </div>
