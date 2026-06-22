@@ -28,29 +28,31 @@ export const api = {
   getSettings: () => request('/settings'),
   updateSettings: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   getProjects: () => request('/projects'),
-  getProject: (id) => request(`/projects/${id}`),
-  getProjectState: (id) => request(`/projects/${id}/state`),
-  deleteProject: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
-  getProjectFiles: (id) => request(`/projects/${id}/files`),
+  getProject: (id) => request(`/projects/${encodeURIComponent(id)}`),
+  getProjectState: (id) => request(`/projects/${encodeURIComponent(id)}/state`),
+  deleteProject: (id) => request(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  getProjectFiles: (id) => request(`/projects/${encodeURIComponent(id)}/files`),
   downloadProject: (id) => {
     const token = localStorage.getItem('token')
-    window.open(`${BASE}/projects/${id}/download${token ? '?token=' + token : ''}`, '_blank')
+    const url = `${BASE}/projects/${encodeURIComponent(id)}/download${token ? '?token=' + encodeURIComponent(token) : ''}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   },
   getProjectConversations: (id) => request(`/projects/${id}/conversations`),
   getProjectExecutions: (id) => request(`/projects/${id}/executions`),
   exportProject: (id) => {
     const token = localStorage.getItem('token')
-    window.open(`${BASE}/projects/${id}/export${token ? '?token=' + token : ''}`, '_blank')
+    const url = `${BASE}/projects/${encodeURIComponent(id)}/export${token ? '?token=' + encodeURIComponent(token) : ''}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   },
-  getQualityScore: (id) => request(`/projects/${id}/quality`),
-  getSecurityReport: (id) => request(`/projects/${id}/security`),
-  getDiff: (id, a, b) => request(`/projects/${id}/diff?a=${a}&b=${b}`),
-  getSnapshots: (id) => request(`/projects/${id}/snapshots`),
+  getQualityScore: (id) => request(`/projects/${encodeURIComponent(id)}/quality`),
+  getSecurityReport: (id) => request(`/projects/${encodeURIComponent(id)}/security`),
+  getDiff: (id, a, b) => request(`/projects/${encodeURIComponent(id)}/diff?a=${a}&b=${b}`),
+  getSnapshots: (id) => request(`/projects/${encodeURIComponent(id)}/snapshots`),
   getTraces: (id, agent, iteration) => {
     const params = new URLSearchParams()
     if (agent) params.set('agent', agent)
     if (iteration != null) params.set('iteration', iteration)
-    return request(`/projects/${id}/traces?${params}`)
+    return request(`/projects/${encodeURIComponent(id)}/traces?${params}`)
   },
   // Presets
   getPresets: () => request('/settings/presets'),

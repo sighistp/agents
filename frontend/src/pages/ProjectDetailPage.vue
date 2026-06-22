@@ -147,7 +147,7 @@ function handleEditConfirm() {
 }
 
 function handleExport() {
-  window.open(api.exportProject(projectId))
+  api.exportProject(projectId)
 }
 
 onMounted(loadState)
