@@ -170,7 +170,7 @@ async def developer_agent(state: dict) -> dict[str, Any]:
                 )
             except asyncio.TimeoutError:
                 return {
-                    "files": files_written,
+                    "files": {**state.get("files", {}), **files_written},
                     "iteration": state.get("iteration", 0) + 1,
                     "key_decisions": key_decisions,
                     "error": f"Developer 步骤 {step+1} 超时（60秒），LLM 未响应",
@@ -253,7 +253,7 @@ async def developer_agent(state: dict) -> dict[str, Any]:
             except Exception:
                 pass
             return {
-                "files": files_written,
+                "files": {**state.get("files", {}), **files_written},
                 "iteration": state.get("iteration", 0) + 1,
                 "key_decisions": key_decisions,
                 "error": f"超过最大步数（{MAX_STEPS}步），任务未正常完成",
@@ -278,7 +278,7 @@ async def developer_agent(state: dict) -> dict[str, Any]:
             except Exception:
                 pass
             return {
-                "files": files_written,
+                "files": {**state.get("files", {}), **files_written},
                 "iteration": state.get("iteration", 0) + 1,
                 "key_decisions": key_decisions,
                 "error": "Developer 未生成任何文件，需求可能不明确",
@@ -300,8 +300,11 @@ async def developer_agent(state: dict) -> dict[str, Any]:
             )
         except Exception:
             pass
+        # Merge with existing files — LangGraph replaces state dicts, not merges them
+        existing_files = state.get("files", {})
+        all_files = {**existing_files, **files_written}
         return {
-            "files": files_written,
+            "files": all_files,
             "iteration": state.get("iteration", 0) + 1,
             "key_decisions": key_decisions,
             "error": None,  # 清除旧 error，否则路由函数一直看到残留值
@@ -327,7 +330,7 @@ async def developer_agent(state: dict) -> dict[str, Any]:
         except Exception:
             pass
         return {
-            "files": files_written,
+            "files": {**state.get("files", {}), **files_written},
             "iteration": state.get("iteration", 0) + 1,
             "key_decisions": key_decisions,
             "error": str(e),

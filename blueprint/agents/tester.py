@@ -176,20 +176,19 @@ async def tester_agent(state: dict) -> dict[str, Any]:
                 # Execute the tool
                 result_str = await asyncio.to_thread(execute_tool, tc, project_dir)
 
-                # Track execute_python failures (only if no test output at all)
-                # Note: pytest may return nonzero for test failures, but we parse
-                # the summary instead. Only flag as error if execution completely
-                # crashed (e.g. syntax error in generated test code).
+                # Track execute_python failures
+                # Reset per-call so only the LAST execute_python matters for test_passed.
+                # Earlier calls (e.g. running non-test files) shouldn't poison the result.
                 if tool_name == "execute_python":
                     try:
                         exec_result = json.loads(result_str)
                         rc = exec_result.get("returncode", 0)
                         stdout = exec_result.get("stdout", "")
                         stderr = exec_result.get("stderr", "")
-                        # Only flag as execution error if no test output was produced
-                        # (pytest output contains "passed" or "failed" even on nonzero exit)
                         if rc != 0 and "passed" not in stdout.lower() and "failed" not in stdout.lower():
                             had_execution_errors = True
+                        else:
+                            had_execution_errors = False  # Reset on successful execution
                     except (json.JSONDecodeError, AttributeError):
                         pass
                 llm_messages.append({

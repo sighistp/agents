@@ -1,0 +1,1 @@
+{"total": 56.5, "dimensions": {"complexity": 60.0, "test_coverage": 50.0, "security": 100, "maintainability": 60.0, "documentation": 0.0}, "grade": "C", "suggestions": ["添加 README.md 和代码注释", "将代码拆分为多个文件，添加 requirements.txt"]}
