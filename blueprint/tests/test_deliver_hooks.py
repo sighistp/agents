@@ -150,3 +150,91 @@ def test_deliver_node_webhook_hook(tmp_path):
         assert call_args[0][0] == "http://example.com/hook"
 
     settings.project_dir = old_val
+
+
+# ── P2.1: Hook parallel execution ──────────────────────────────────────────
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_hooks_run_in_parallel():
+    """P2.1: Independent hooks should run concurrently, not serially."""
+    import asyncio
+    import time
+
+    call_log = []
+
+    async def hook_a():
+        call_log.append(("a", "start", time.monotonic()))
+        await asyncio.sleep(0.1)
+        call_log.append(("a", "end", time.monotonic()))
+
+    async def hook_b():
+        call_log.append(("b", "start", time.monotonic()))
+        await asyncio.sleep(0.1)
+        call_log.append(("b", "end", time.monotonic()))
+
+    start = time.monotonic()
+    await asyncio.gather(hook_a(), hook_b())
+    elapsed = time.monotonic() - start
+
+    # If parallel, total ~0.1s. If serial, ~0.2s
+    assert elapsed < 0.15, f"Hooks ran serially ({elapsed:.2f}s), expected parallel"
+
+
+@pytest.mark.asyncio
+async def test_parallel_hooks_with_exception():
+    """P2.1: asyncio.gather with return_exceptions=True should not raise on hook failure."""
+    import asyncio
+
+    async def good_hook():
+        await asyncio.sleep(0.01)
+        return "ok"
+
+    async def bad_hook():
+        await asyncio.sleep(0.01)
+        raise RuntimeError("hook exploded")
+
+    # Should not raise — return_exceptions=True catches it
+    results = await asyncio.gather(good_hook(), bad_hook(), return_exceptions=True)
+    assert results[0] == "ok"
+    assert isinstance(results[1], RuntimeError)
+
+
+@pytest.mark.asyncio
+async def test_run_post_deliver_hooks_uses_parallel_execution(tmp_path):
+    """P2.1: _run_post_deliver_hooks should run independent hooks concurrently."""
+    import asyncio
+    import time
+    from blueprint.agents import graph
+
+    call_log = []
+
+    async def slow_hook_a(state, project_dir):
+        call_log.append(("a", "start"))
+        await asyncio.sleep(0.1)
+        call_log.append(("a", "end"))
+
+    async def slow_hook_b(state, project_dir):
+        call_log.append(("b", "start"))
+        await asyncio.sleep(0.1)
+        call_log.append(("b", "end"))
+
+    async def slow_hook_c(state, project_dir):
+        call_log.append(("c", "start"))
+        await asyncio.sleep(0.1)
+        call_log.append(("c", "end"))
+
+    original_hooks = graph._post_deliver_hooks
+    graph._post_deliver_hooks = [slow_hook_a, slow_hook_b, slow_hook_c]
+    try:
+        start = time.monotonic()
+        result = await graph._run_post_deliver_hooks({}, tmp_path)
+        elapsed = time.monotonic() - start
+
+        # If parallel: ~0.1s. If serial: ~0.3s
+        assert elapsed < 0.2, f"Hooks ran serially ({elapsed:.2f}s), expected parallel execution"
+        assert result is None  # Function should return None
+    finally:
+        graph._post_deliver_hooks = original_hooks

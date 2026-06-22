@@ -101,13 +101,44 @@ def human_confirm_node(state: ProjectState) -> dict[str, Any]:
 _post_deliver_hooks: list = []
 
 
-def _run_post_deliver_hooks(state: dict, project_dir):
-    """Execute all post-deliver hooks. Failures are logged but don't break delivery."""
-    for hook in _post_deliver_hooks:
+async def _run_post_deliver_hooks(state: dict, project_dir):
+    """Run post-deliver hooks. Independent hooks run in parallel."""
+    import asyncio
+
+    # Hooks that need ordering
+    ordered_names = {"save_snapshot_hook", "webhook_hook"}
+    # Independent hooks that can run in parallel
+    parallel_hooks = [h for h in _post_deliver_hooks if getattr(h, '__name__', '') not in ordered_names]
+
+    # Sequential: snapshot first
+    if save_snapshot_hook in _post_deliver_hooks:
         try:
-            hook(state, project_dir)
+            result = save_snapshot_hook(state, project_dir)
+            if asyncio.iscoroutine(result):
+                await result
         except Exception as e:
-            logger.warning(f"Post-deliver hook {getattr(hook, '__name__', '?')} failed: {e}")
+            logger.warning(f"Post-deliver hook save_snapshot_hook failed: {e}")
+
+    # Parallel: independent analysis hooks
+    if parallel_hooks:
+        async def _run_hook(h):
+            try:
+                result = h(state, project_dir)
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception as e:
+                logger.warning(f"Post-deliver hook {getattr(h, '__name__', '?')} failed: {e}")
+
+        await asyncio.gather(*[_run_hook(h) for h in parallel_hooks])
+
+    # Sequential: webhook last
+    if webhook_hook in _post_deliver_hooks:
+        try:
+            result = webhook_hook(state, project_dir)
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception as e:
+            logger.warning(f"Post-deliver hook webhook_hook failed: {e}")
 
 
 def save_snapshot_hook(state: dict, project_dir):
@@ -289,10 +320,11 @@ def deliver_node(state: ProjectState) -> dict[str, Any]:
         "architecture": state.get("architecture", {}),
         "iteration": state.get("iteration", 0),
     }
-    (project_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2))
+    (project_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # Run post-deliver hooks (snapshot, quality score, security scan)
-    _run_post_deliver_hooks(state, project_dir)
+    import asyncio
+    asyncio.run(_run_post_deliver_hooks(state, project_dir))
 
     return {
         "status": "delivered",
@@ -516,6 +548,7 @@ def create_graph():
     graph.add_conditional_edges("developer", route_after_developer, {
         "tester": "tester",
         "developer": "developer",  # Error retry
+        "human_confirm": "human_confirm",  # Max retries → let user decide
         END: END,
     })
 
@@ -536,8 +569,7 @@ def create_graph():
     graph.add_edge("deliver", END)
 
     # Compile with checkpointer for interrupt/resume support
-    # MemorySaver: state in memory, lost on restart
-    # TODO: upgrade to SqliteSaver for persistence when needed
+    # TODO: upgrade to AsyncSqliteSaver for persistence (needs async graph init refactor)
     from langgraph.checkpoint.memory import MemorySaver
     checkpointer = MemorySaver()
 

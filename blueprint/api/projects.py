@@ -18,6 +18,7 @@ Endpoints:
 
 import io
 import json
+import logging
 import os
 import re
 import uuid
@@ -28,6 +29,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from blueprint.utils.diff_engine import DiffEngine
 from blueprint.utils.memory import get_memory
@@ -92,6 +95,14 @@ def _validate_file_path(file_path: str) -> None:
     normalized = os.path.normpath(file_path)
     if ".." in normalized.split(os.sep) or os.path.isabs(normalized):
         raise HTTPException(status_code=400, detail="Invalid file path")
+
+
+def _sanitize_filename(filename: str) -> str:
+    """Sanitize filename for Content-Disposition header to prevent injection."""
+    # Remove control characters and path separators
+    sanitized = re.sub(r'[\r\n\x00-\x1f\\/:*?"<>|]', '_', filename)
+    # Limit length
+    return sanitized[:200]
 
 
 def _safe_resolve(base: Path, file_path: str) -> Path:
@@ -352,13 +363,13 @@ async def preview_file(project_id: str, file_path: str):
         return StreamingResponse(
             io.BytesIO(full_path.read_bytes()),
             media_type="application/octet-stream",
-            headers={"Content-Disposition": f'inline; filename="{full_path.name}"'},
+            headers={"Content-Disposition": f'inline; filename="{_sanitize_filename(full_path.name)}"'},
         )
 
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type=_get_media_type(file_path),
-        headers={"Content-Disposition": f'inline; filename="{full_path.name}"'},
+        headers={"Content-Disposition": f'inline; filename="{_sanitize_filename(full_path.name)}"'},
     )
 
 
@@ -382,7 +393,7 @@ def download_project(project_id: str):
         io.BytesIO(zip_content),
         media_type="application/zip",
         headers={
-            "Content-Disposition": f'attachment; filename="{project_id}.zip"',
+            "Content-Disposition": f'attachment; filename="{_sanitize_filename(project_id + ".zip")}"',
             "Content-Length": str(len(zip_content)),
         },
     )
@@ -408,7 +419,7 @@ async def download_file(project_id: str, file_path: str):
         io.BytesIO(file_content),
         media_type="application/octet-stream",
         headers={
-            "Content-Disposition": f'attachment; filename="{full_path.name}"',
+            "Content-Disposition": f'attachment; filename="{_sanitize_filename(full_path.name)}"',
             "Content-Length": str(len(file_content)),
         },
     )
@@ -503,7 +514,7 @@ def export_project(project_id: str):
         io.BytesIO(content),
         media_type="application/zip",
         headers={
-            "Content-Disposition": f'attachment; filename="{project_id}.zip"',
+            "Content-Disposition": f'attachment; filename="{_sanitize_filename(project_id + ".zip")}"',
             "Content-Length": str(len(content)),
         },
     )
@@ -614,7 +625,7 @@ def delete_project(project_id: str):
     # Remove from memory
     try:
         get_memory().update_status(project_id, "deleted")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to update memory status for deleted project: %s", e, exc_info=True)
 
     return {"status": "deleted", "project_id": project_id}

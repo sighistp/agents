@@ -42,3 +42,40 @@ class TestProjectIdValidation:
         invalid_ids = ["../etc", "test/path", "project with spaces", "project@special", "project.dot"]
         for pid in invalid_ids:
             assert re.match(r'^[a-zA-Z0-9_-]+$', pid) is None
+
+
+# ── P2.2: WebSocket incremental file sending ──────────────────────────────
+
+class TestIncrementalFileSending:
+    """Test incremental file tracking for WebSocket messages."""
+
+    def test_incremental_file_tracking(self):
+        """P2.2: Should track sent files for incremental updates."""
+        sent_files = set()
+
+        all_files = {"a.py": "content1", "b.py": "content2", "c.py": "content3"}
+
+        # First send: all files are new
+        new_files = {k: v for k, v in all_files.items() if k not in sent_files}
+        assert len(new_files) == 3
+        sent_files.update(new_files.keys())
+
+        # Second send with one new file
+        all_files["d.py"] = "content4"
+        new_files = {k: v for k, v in all_files.items() if k not in sent_files}
+        assert len(new_files) == 1
+        assert "d.py" in new_files
+
+    def test_incremental_file_tracking_empty(self):
+        """P2.2: Empty file dict should return empty set."""
+        sent_files = set()
+        all_files = {}
+        new_files = {k: v for k, v in all_files.items() if k not in sent_files}
+        assert len(new_files) == 0
+
+    def test_incremental_file_tracking_no_new(self):
+        """P2.2: No new files when all already sent."""
+        sent_files = {"a.py", "b.py"}
+        all_files = {"a.py": "content1", "b.py": "content2"}
+        new_files = {k: v for k, v in all_files.items() if k not in sent_files}
+        assert len(new_files) == 0

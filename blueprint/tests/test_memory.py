@@ -238,3 +238,24 @@ def test_save_execution_with_tool_calls(memory):
     execs = memory.get_executions("proj-1")
     assert len(execs) == 1
     assert execs[0]["tool_calls"] is not None
+
+
+# ── Connection Cleanup Tests ───────────────────────────────────────────────
+
+def test_close_all_closes_thread_local_connections():
+    """P1.6: close_all() should close thread-local connections."""
+    db_path = tempfile.mktemp(suffix=".db")
+    try:
+        mem = ProjectMemory(db_path)
+        conn = mem._get_conn()  # Create a connection
+        assert conn is not None
+        mem.close_all()
+        # After close_all, _get_conn should create a new connection
+        # (old one is closed)
+        conn2 = mem._get_conn()
+        assert conn2 is not None
+        assert conn2 is not conn  # Should be a fresh connection
+        mem.close_all()
+    finally:
+        if os.path.exists(db_path):
+            os.unlink(db_path)

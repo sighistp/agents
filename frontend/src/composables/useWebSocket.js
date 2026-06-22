@@ -8,6 +8,7 @@ let reconnectTimer = null
 let activeProjectId = null  // 当前活跃项目 ID，忽略旧项目的消息
 let reconnectDelay = 1000   // 指数退避：1s → 2s → 4s → 8s → 16s → 30s(max)
 const MAX_RECONNECT_DELAY = 30000
+const SEEN_MESSAGE_LIMIT = 1000
 const seenMessageIds = new Set()  // 消息去重集合
 
 function handleMessage(data) {
@@ -50,6 +51,13 @@ function handleMessage(data) {
           const dedupeKey = m.name + ':' + (m.content || '').slice(0, 100)
           if (!seenMessageIds.has(dedupeKey)) {
             seenMessageIds.add(dedupeKey)
+            if (seenMessageIds.size > SEEN_MESSAGE_LIMIT) {
+              const iterator = seenMessageIds.values()
+              const toRemove = seenMessageIds.size - SEEN_MESSAGE_LIMIT + 100
+              for (let j = 0; j < toRemove; j++) {
+                seenMessageIds.delete(iterator.next().value)
+              }
+            }
             projectStore.addMessage(m)
           }
         })

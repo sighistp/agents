@@ -96,7 +96,7 @@ class TesterOutput(BaseModel):
 class ReviewIssue(BaseModel):
     file: str
     line: int | None = None
-    severity: Literal["critical", "warning", "suggestion"]
+    severity: Literal["critical", "important", "minor"]
     description: str
     suggestion: str
 

@@ -345,6 +345,19 @@ class ProjectMemory:
             self._local.conn.close()
             self._local.conn = None
 
+    def close_all(self):
+        """Close all thread-local connections.
+
+        Unlike close(), this method uses try/except to ensure cleanup
+        even if the connection is in a bad state.
+        """
+        if hasattr(self._local, 'conn') and self._local.conn is not None:
+            try:
+                self._local.conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
+
 
 # ── Module-level singleton ──────────────────────────────────────────────────
 

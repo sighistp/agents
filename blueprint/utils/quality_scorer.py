@@ -1,7 +1,10 @@
 """Project quality scorer — AST-based 5 dimensions,满分 100."""
 import ast
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 SCORE_DIMENSIONS = {
     "complexity": {"weight": 25, "desc": "代码复杂度"},
@@ -66,8 +69,8 @@ class QualityScorer:
                         length = (node.end_lineno or node.lineno) - node.lineno
                         function_lengths.append(length)
                         nesting_depths.append(self._calc_nesting(node))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to parse file for complexity scoring: %s", e, exc_info=True)
 
         if not function_lengths:
             return 60.0
@@ -117,8 +120,8 @@ class QualityScorer:
                 for pattern in dangerous:
                     if pattern in content:
                         violations += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to read file for security scoring: %s", e, exc_info=True)
         return max(0, 100 - violations * 20)
 
     def _score_maintainability(self, files: list[Path]) -> float:
@@ -141,8 +144,8 @@ class QualityScorer:
                     if '"""' in content or "'''" in content:
                         has_docstrings = True
                         break
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to read file for documentation scoring: %s", e, exc_info=True)
         score = 0.0
         if has_readme: score += 60.0
         if has_docstrings: score += 40.0

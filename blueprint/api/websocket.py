@@ -382,9 +382,11 @@ async def ws_project(websocket: WebSocket):
     drainer_task = None
     paused = False
     heartbeat_task = None
+    _sent_files = set()  # Track sent files for incremental updates
 
     async def _drain_queue():
         """Continuously drain queue and send to WebSocket."""
+        nonlocal _sent_files
         while True:
             try:
                 ev_msg = await asyncio.wait_for(msg_queue.get(), timeout=1.0)
@@ -392,6 +394,15 @@ async def ws_project(websocket: WebSocket):
                 msg_epoch = ev_msg.pop("_epoch", 0)
                 if msg_epoch < epoch:
                     continue  # Stale message, discard
+                # Incremental file sending: only send new/changed files
+                msg_type = ev_msg.get("type")
+                if msg_type in ("agent_update", "project_done"):
+                    data = ev_msg.get("data", {})
+                    all_files = data.get("files", {})
+                    if all_files:
+                        new_files = {k: v for k, v in all_files.items() if k not in _sent_files}
+                        data["files"] = new_files
+                        _sent_files.update(new_files.keys())
                 await websocket.send_json(ev_msg)
                 if ev_msg.get("type") in ("project_done", "error"):
                     return

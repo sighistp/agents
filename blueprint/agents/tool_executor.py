@@ -1,4 +1,5 @@
 """工具执行引擎"""
+import hashlib
 import json
 import os
 import tempfile
@@ -7,6 +8,11 @@ from pathlib import Path
 from blueprint.agents.tools import get_call_name, get_call_args
 
 _progress_callback = None
+
+# Directory cache for execute_python: avoids copying unchanged project files
+_dir_cache = {"hash": None, "path": None}
+_sensitive_names = {'.env', '.env.local', '.blueprint_secret', 'settings.json', '.git',
+                    'node_modules', '__pycache__', 'venv', '.venv', '.superpowers'}
 
 def set_progress_callback(cb):
     global _progress_callback
@@ -94,46 +100,81 @@ def _file_read(args, project_dir):
         return json.dumps({"content": f.read()})
 
 
+def _hash_project_dir(project_dir: str) -> str:
+    """Compute hash of project directory contents (excluding sensitive files)."""
+    h = hashlib.md5()
+    for item in sorted(os.listdir(project_dir)):
+        if item in _sensitive_names or item.startswith('.'):
+            continue
+        path = os.path.join(project_dir, item)
+        if os.path.isfile(path):
+            try:
+                h.update(item.encode())
+                h.update(open(path, "rb").read())
+            except OSError:
+                pass
+    return h.hexdigest()
+
+
+def _get_cached_workdir(project_dir: str) -> str:
+    """Get or create cached workdir for project. Returns path to workdir."""
+    global _dir_cache
+    current_hash = _hash_project_dir(project_dir)
+
+    # Cache hit: reuse existing workdir
+    if _dir_cache["hash"] == current_hash and _dir_cache["path"] and os.path.isdir(_dir_cache["path"]):
+        return _dir_cache["path"]
+
+    # Cache miss: create new workdir
+    import shutil
+    workdir = tempfile.mkdtemp(prefix="bp_exec_")
+    for item in os.listdir(project_dir):
+        if item in _sensitive_names or item.startswith('.'):
+            continue
+        src = os.path.join(project_dir, item)
+        dst = os.path.join(workdir, item)
+        try:
+            if os.path.isfile(src):
+                shutil.copy2(src, dst)
+            elif os.path.isdir(src):
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+        except (OSError, shutil.Error):
+            pass
+
+    # Clean up old cached workdir
+    old_path = _dir_cache.get("path")
+    if old_path and os.path.isdir(old_path):
+        try:
+            shutil.rmtree(old_path)
+        except OSError:
+            pass
+
+    _dir_cache["hash"] = current_hash
+    _dir_cache["path"] = workdir
+    return workdir
+
+
 def _execute_python(args, project_dir):
     """Execute Python code with project files available.
 
-    Copies project files to temp directory so imports work,
-    but blocks access to sensitive files like .env.
+    Uses cached directory copy when project files haven't changed.
     """
-    import shutil
     code = args["code"]
     _check_code_safety(code)
     from blueprint.sandbox.executor import execute_python as sandbox_exec
     timeout = min(args.get("timeout", 15), 30)
 
-    # Create a working directory with project files (excluding sensitive ones)
-    with tempfile.TemporaryDirectory() as workdir:
-        if project_dir and os.path.isdir(project_dir):
-            sensitive_names = {'.env', '.env.local', '.blueprint_secret', 'settings.json', '.git',
-                               'node_modules', '__pycache__', 'venv', '.venv', '.superpowers'}
-            for item in os.listdir(project_dir):
-                if item in sensitive_names or item.startswith('.'):
-                    continue
-                src = os.path.join(project_dir, item)
-                dst = os.path.join(workdir, item)
-                try:
-                    if os.path.isfile(src):
-                        shutil.copy2(src, dst)
-                    elif os.path.isdir(src):
-                        shutil.copytree(src, dst, dirs_exist_ok=True)
-                except (OSError, shutil.Error):
-                    pass
+    # Get cached workdir (reuses copy if project unchanged)
+    workdir = _get_cached_workdir(project_dir) if project_dir and os.path.isdir(project_dir) else tempfile.mkdtemp()
 
-        result = sandbox_exec(code, timeout=timeout, cwd=workdir)
-        return json.dumps(result)
+    result = sandbox_exec(code, timeout=timeout, cwd=workdir)
+    return json.dumps(result)
 
 
 # 统一的危险模式列表
+# NOTE: import requests/httpx are legitimate third-party libraries and should NOT be blocked.
+# Only block actual dangerous operations (subprocess, shell, eval, filesystem destruction).
 _DANGEROUS_PATTERNS = [
-    'import socket',
-    'import urllib',
-    'import requests',
-    'import httpx',
     'import subprocess',
     'os.system(',
     'os.popen(',

@@ -75,8 +75,11 @@ class Settings(BaseSettings):
     show_discussion: bool = False  # Show discussion panel in frontend (only when agent_mode="max")
 
     # -- Auth ------------------------------------------------------------------
-    auth_enabled: bool = False
+    auth_enabled: bool = True  # Set BLUEPRINT_AUTH_ENABLED=false for local dev without auth
     auth_keys: str = "{}"  # JSON格式 {"user_id": "api_key"}
+
+    # -- CORS -----------------------------------------------------------------
+    cors_origins: list[str] = ["http://localhost:5173"]  # Production: set via BLUEPRINT_CORS_ORIGINS env var
 
     # -- Project directory ---------------------------------------------------
     project_dir: str = _DEFAULT_PROJECTS_DIR

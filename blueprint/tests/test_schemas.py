@@ -165,7 +165,7 @@ def test_tester_output_valid():
 
 
 def test_reviewer_output_valid():
-    """Reviewer output with only warning issues should be auto-approved."""
+    """Reviewer output with only non-critical issues should be auto-approved."""
     from blueprint.agents.schemas import ReviewerOutput, ReviewIssue
 
     output = ReviewerOutput(
@@ -173,7 +173,7 @@ def test_reviewer_output_valid():
             ReviewIssue(
                 file="main.py",
                 line=10,
-                severity="warning",
+                severity="important",
                 description="Missing docstring",
                 suggestion="Add docstring to function"
             )
@@ -182,7 +182,7 @@ def test_reviewer_output_valid():
     )
 
     assert len(output.issues) == 1
-    assert output.issues[0].severity == "warning"
+    assert output.issues[0].severity == "important"
     assert output.approved is True  # Auto-computed: no critical issues
 
 
@@ -205,3 +205,39 @@ def test_reviewer_output_critical_not_approved():
 
     assert output.approved is False  # Auto-computed: has critical issue
     assert output.issues[0].severity == "critical"
+
+
+def test_review_issue_severity_enum():
+    """P2.7: ReviewIssue severity should use critical/important/minor."""
+    from blueprint.agents.schemas import ReviewIssue
+    issue = ReviewIssue(
+        file="test.py",
+        line=1,
+        severity="important",
+        description="test issue",
+        suggestion="fix it"
+    )
+    assert issue.severity == "important"
+
+    # Should reject old values
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        ReviewIssue(
+            file="test.py",
+            line=1,
+            severity="warning",  # Old value, should fail
+            description="test",
+            suggestion="fix"
+        )
+
+
+def test_review_issue_severity_minor():
+    """P2.7: minor severity should be accepted."""
+    from blueprint.agents.schemas import ReviewIssue
+    issue = ReviewIssue(
+        file="test.py",
+        severity="minor",
+        description="style issue",
+        suggestion="fix formatting"
+    )
+    assert issue.severity == "minor"

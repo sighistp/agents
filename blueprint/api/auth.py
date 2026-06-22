@@ -39,6 +39,26 @@ def _get_jwt_secret() -> str:
                 # Generate new secret and persist it
                 _JWT_SECRET = secrets.token_hex(32)
                 _SECRET_FILE.write_text(_JWT_SECRET)
+                try:
+                    import stat as _stat
+                    os.chmod(str(_SECRET_FILE), _stat.S_IRUSR | _stat.S_IWUSR)
+                except OSError:
+                    pass  # Windows doesn't support full chmod
+                try:
+                    import stat as _stat
+                    os.chmod(str(_SECRET_FILE), _stat.S_IRUSR | _stat.S_IWUSR)
+                except OSError:
+                    pass  # Windows
+                try:
+                    import stat as _stat
+                    os.chmod(str(_SECRET_FILE), _stat.S_IRUSR | _stat.S_IWUSR)
+                except OSError:
+                    pass  # Windows doesn't support full chmod
+                try:
+                    import stat as _stat
+                    os.chmod(str(_SECRET_FILE), _stat.S_IRUSR | _stat.S_IWUSR)
+                except OSError:
+                    pass  # Windows
     return _JWT_SECRET
 
 

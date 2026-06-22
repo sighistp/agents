@@ -99,10 +99,7 @@ def _extract_test_passed(summary: str, had_execution_errors: bool) -> bool:
         if kw in summary_lower:
             return True
 
-    return True
-
-
-# ── Agent Node ──────────────────────────────────────────────────────────────
+    return False  # P2.4: No pattern matched → default to False (safe assumption)
 
 async def tester_agent(state: dict) -> dict[str, Any]:
     """Tester agent: tool-loop based testing.
@@ -179,11 +176,19 @@ async def tester_agent(state: dict) -> dict[str, Any]:
                 # Execute the tool
                 result_str = await asyncio.to_thread(execute_tool, tc, project_dir)
 
-                # Track execute_python failures
+                # Track execute_python failures (only if no test output at all)
+                # Note: pytest may return nonzero for test failures, but we parse
+                # the summary instead. Only flag as error if execution completely
+                # crashed (e.g. syntax error in generated test code).
                 if tool_name == "execute_python":
                     try:
                         exec_result = json.loads(result_str)
-                        if exec_result.get("returncode", 0) != 0:
+                        rc = exec_result.get("returncode", 0)
+                        stdout = exec_result.get("stdout", "")
+                        stderr = exec_result.get("stderr", "")
+                        # Only flag as execution error if no test output was produced
+                        # (pytest output contains "passed" or "failed" even on nonzero exit)
+                        if rc != 0 and "passed" not in stdout.lower() and "failed" not in stdout.lower():
                             had_execution_errors = True
                     except (json.JSONDecodeError, AttributeError):
                         pass

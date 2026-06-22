@@ -9,6 +9,46 @@ import pytest
 from blueprint.utils.webhook import WebhookManager
 
 
+# --- P0.4: SSRF protection tests ---
+
+class TestWebhookURLValidation:
+    """P0.4: Webhook URL must reject internal/private IPs."""
+
+    @pytest.mark.parametrize("url", [
+        "http://127.0.0.1:8080/evil",
+        "http://localhost/evil",
+        "http://[::1]/evil",
+        "http://10.0.0.1/evil",
+        "http://10.255.255.255/evil",
+        "http://172.16.0.1/evil",
+        "http://172.31.255.255/evil",
+        "http://192.168.0.1/evil",
+        "http://192.168.255.255/evil",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://0.0.0.0/evil",
+    ])
+    def test_rejects_private_urls(self, url):
+        """Should reject URLs targeting private/internal IPs."""
+        from blueprint.utils.webhook import WebhookManager
+        wm = WebhookManager()
+        with pytest.raises(ValueError, match="private|internal|blocked|not allowed|forbidden|localhost"):
+            wm.add_webhook(url)
+
+    def test_allows_public_url(self):
+        """Should allow public URLs."""
+        from blueprint.utils.webhook import WebhookManager
+        wm = WebhookManager()
+        result = wm.add_webhook("https://hooks.example.com/webhook")
+        assert result["url"] == "https://hooks.example.com/webhook"
+
+    def test_allows_http_public(self):
+        """Should allow HTTP public URLs."""
+        from blueprint.utils.webhook import WebhookManager
+        wm = WebhookManager()
+        result = wm.add_webhook("http://example.com:8080/hook")
+        assert "example.com" in result["url"]
+
+
 @pytest.mark.asyncio
 async def test_webhook_manager_notify():
     """Should send webhook notification."""

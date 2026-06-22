@@ -2,8 +2,11 @@
 import difflib
 import gzip
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class DiffEngine:
@@ -24,8 +27,8 @@ class DiffEngine:
                     try:
                         rel = str(f.relative_to(self.project_dir))
                         snapshot[rel] = f.read_text(encoding="utf-8", errors="replace")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("Failed to read file for snapshot: %s", e, exc_info=True)
         snap_file = self.snapshots_dir / f"iter_{iteration:03d}.json"
         data = json.dumps(snapshot, ensure_ascii=False).encode("utf-8")
         if len(data) > 10240:
@@ -84,8 +87,8 @@ class DiffEngine:
                 name = name[:-3]  # remove .gz from iter_001.json.gz
             try:
                 results.append(int(name.split("_")[1]))
-            except (IndexError, ValueError):
-                pass
+            except (IndexError, ValueError) as e:
+                logger.warning("Failed to parse snapshot filename: %s", e, exc_info=True)
         return sorted(results)
 
     def _load_snapshot(self, iteration: int) -> dict[str, str]:

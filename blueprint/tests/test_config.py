@@ -264,3 +264,46 @@ class TestBaseSettingsBehavior:
         s = Settings()
         # model_config should specify env_prefix
         assert s.model_config.get("env_prefix") == "BLUEPRINT_"
+
+
+# ---------------------------------------------------------------------------
+# Test: Auth defaults (Issue 0.1)
+# ---------------------------------------------------------------------------
+
+class TestAuthDefaults:
+    """Auth must be enabled by default for security."""
+
+    def test_auth_enabled_default_true(self):
+        """P0.1: Auth must be enabled by default for security."""
+        import importlib
+        import blueprint.config as cfg
+        importlib.reload(cfg)
+        s = cfg.Settings()
+        assert s.auth_enabled is True
+
+
+# ---------------------------------------------------------------------------
+# Test: CORS origins defaults (Issue 0.2)
+# ---------------------------------------------------------------------------
+
+class TestCORSDefaults:
+    """CORS origins should default to localhost only, not wildcard."""
+
+    def test_cors_origins_default(self):
+        """P0.2: CORS origins should default to localhost only."""
+        from blueprint.config import Settings
+        s = Settings()
+        assert s.cors_origins == ["http://localhost:5173"]
+
+    def test_cors_origins_is_list(self):
+        """P0.2: cors_origins must be a list."""
+        from blueprint.config import Settings
+        s = Settings()
+        assert isinstance(s.cors_origins, list)
+
+    def test_cors_origins_override(self):
+        """P0.2: cors_origins can be overridden."""
+        from blueprint.config import Settings
+        custom = ["https://example.com", "https://app.example.com"]
+        s = Settings(cors_origins=custom)
+        assert s.cors_origins == custom

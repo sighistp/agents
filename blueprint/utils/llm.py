@@ -2,6 +2,7 @@
 import asyncio
 import functools
 import json
+import logging
 import sys
 import os
 import threading
@@ -9,14 +10,16 @@ from pathlib import Path
 from threading import Semaphore
 from blueprint.utils.cost_tracker import record_cost
 
+logger = logging.getLogger(__name__)
+
 # Windows 编码修复
 if sys.platform == "win32":
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Windows console reconfigure failed: %s", e, exc_info=True)
 
 from langchain_openai import ChatOpenAI
 
@@ -40,14 +43,36 @@ def retry(max_attempts=3, backoff_base=1.0):
 _llm_semaphore = Semaphore(5)
 
 
+def trim_messages(messages: list, max_messages: int = 20) -> list:
+    """Trim messages to a sliding window, preserving system messages and recency.
+
+    P1.7: Prevents quadratic token growth by capping conversation length.
+    """
+    if len(messages) <= max_messages:
+        return list(messages)
+
+    system_msgs = [m for m in messages if isinstance(m, dict) and m.get("role") == "system"]
+    non_system = [m for m in messages if not (isinstance(m, dict) and m.get("role") == "system")]
+
+    remaining = max_messages - len(system_msgs) - 1  # -1 for summary placeholder
+    if remaining < 1:
+        remaining = 1
+    recent = non_system[-remaining:]
+
+    dropped = len(non_system) - len(recent)
+    summary_msg = {"role": "system", "content": f"Earlier conversation summary: {dropped} earlier messages omitted."}
+
+    return system_msgs + [summary_msg] + recent
+
+
 def _load_web_settings() -> dict:
     """Load settings from web UI (data/settings.json)."""
     settings_file = Path(__file__).parent.parent / "data" / "settings.json"
     if settings_file.exists():
         try:
             return json.loads(settings_file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, IOError):
-            pass
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning("Failed to load web settings: %s", e, exc_info=True)
     return {}
 
 
@@ -58,7 +83,18 @@ def _create_llm() -> ChatOpenAI:
     # Check web UI settings first, then fall back to config
     web_settings = _load_web_settings()
 
-    api_key = web_settings.get("api_key") or settings.llm_api_key or settings.deepseek_api_key
+    # API key: try web UI settings → secure API key file → config
+    api_key = web_settings.get("api_key")
+    if not api_key:
+        api_key_file = Path(__file__).parent.parent / "data" / ".api_key"
+        if api_key_file.exists():
+            try:
+                api_key = api_key_file.read_text(encoding="utf-8").strip()
+            except Exception:
+                pass
+    if not api_key:
+        api_key = settings.llm_api_key or settings.deepseek_api_key
+
     base_url = web_settings.get("base_url") or settings.llm_base_url or settings.deepseek_base_url
     model = web_settings.get("model") or settings.llm_model or settings.deepseek_model
 

@@ -1,9 +1,12 @@
 """Security scanner — wraps bandit (Python) + npm audit (Node) + custom patterns."""
 import json
+import logging
 import re
 import subprocess
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class SecurityScanner:
@@ -47,8 +50,8 @@ class SecurityScanner:
                                 "description": description,
                                 "code": line.strip()[:100],
                             })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to scan file for security patterns: %s", e, exc_info=True)
 
         return self._compile_report(issues)
 
@@ -70,10 +73,10 @@ class SecurityScanner:
                         "description": item.get("issue_text", ""),
                         "code": item.get("code", "")[:100],
                     })
-        except FileNotFoundError:
-            pass
-        except Exception:
-            pass
+        except FileNotFoundError as e:
+            logger.warning("Bandit not found, skipping Python security scan: %s", e)
+        except Exception as e:
+            logger.warning("Bandit scan failed: %s", e, exc_info=True)
         return issues
 
     def _run_npm_audit(self, project_dir: str) -> list[dict]:
@@ -98,10 +101,10 @@ class SecurityScanner:
                         "description": f"{vuln.get('name', 'unknown')}: {vuln.get('title', '')}",
                         "code": "",
                     })
-        except FileNotFoundError:
-            pass
-        except Exception:
-            pass
+        except FileNotFoundError as e:
+            logger.warning("npm not found, skipping Node security scan: %s", e)
+        except Exception as e:
+            logger.warning("npm audit failed: %s", e, exc_info=True)
         return issues
 
     def _compile_report(self, issues: list[dict]) -> dict[str, Any]:

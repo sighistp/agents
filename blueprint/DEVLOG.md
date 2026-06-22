@@ -3958,3 +3958,114 @@ deliver_node → 写文件 → meta.json → hook 链:
 - 后端 362 通过
 - 前端 101 通过
 - **合计 463**
+
+---
+
+## Phase 80：修复计划书全量修复（2026-06-23）
+
+**来源：** 修复计划书 30 项（P0×7 + P1×9 + P2×8 + P3×6）
+**方法：** 7 个子代理并行 + 主线程补漏，严格 TDD（先写失败测试 → 实现 → 通过）
+
+### 已修复（20/30）
+
+#### P0 紧急（5/7 已修）
+
+| # | 问题 | 修复 | 文件 |
+|---|------|------|------|
+| 0.1 | auth_enabled 默认 False | 改为 `True`，本地用 `BLUEPRINT_AUTH_ENABLED=false` | config.py |
+| 0.2 | CORS 通配 | 新增 `cors_origins` 配置，默认 `["http://localhost:5173"]` | config.py, main.py |
+| 0.3 | API 端点无认证 | 全部端点加 `Depends(verify_api_key)` | projects.py, settings.py |
+| 0.4 | Webhook SSRF | `_validate_webhook_url()` 拒绝内网 IP | webhook.py |
+| 0.6 | 设置每次读磁盘 | `_settings_cache` + 30 秒 TTL | llm.py |
+
+#### P1 重要（5/9 已修）
+
+| # | 问题 | 修复 | 文件 |
+|---|------|------|------|
+| 1.1 | JWT Secret 无权限 | `os.chmod(0o600)` | auth.py |
+| 1.2 | base_url 无校验 | `_validate_base_url()` 拒绝私有 IP | settings.py |
+| 1.6 | SQLite 连接泄漏 | `close_all()` 方法 | memory.py |
+| 1.7 | 消息无滑动窗口 | `trim_messages()` 保留 system + 最近 20 条 | llm.py |
+| 1.9 | requirements 无版本 | 全部加 `>=x.y,<z.0` | requirements.txt |
+
+#### P2 改善（6/8 已修）
+
+| # | 问题 | 修复 | 文件 |
+|---|------|------|------|
+| 2.1 | Hook 串行 | 测试验证 `asyncio.gather` 并行 | test_deliver_hooks.py |
+| 2.4 | test_passed 默认 True | 改为 `False` | tester.py |
+| 2.5 | Content-Disposition 注入 | `_sanitize_filename()` | projects.py |
+| 2.6 | except:pass 清理 | 6 个 utils 文件审计 + 白名单 | test_error_logging.py |
+| 2.7 | Severity 枚举不一致 | 统一 `"critical"/"important"/"minor"` | schemas.py |
+| 2.8 | meta.json 无 encoding | `encoding="utf-8"` | graph.py |
+
+#### P3（2/6 已修）
+
+| # | 问题 | 修复 | 文件 |
+|---|------|------|------|
+| 3.5 | seenMessageIds 无限增长 | LRU 上限 1000 | useWebSocket.js |
+| 3.6 | CSS 硬编码 width | `max-width: 1126px; width: 100%` | style.css |
+
+### 暂缓项（10 项）
+
+| # | 问题 | 暂缓原因 |
+|---|------|----------|
+| 0.5 | Secret 从 git 清理 | 需 `git rm --cached` + BFG，手动操作 |
+| 0.7 | Graph 编译缓存 | SqliteSaver 不支持 async，需架构重构 |
+| 1.3 | 项目所有权校验 | 需改 schema + 所有 API，3h+ |
+| 1.4 | Token 迁移到 Header | 需改 WebSocket + 前端，2h+ |
+| 1.5 | MemorySaver→SqliteSaver | 需 async graph init 重构 |
+| 1.8 | 危险模式 AST 检测 | 字符串匹配已加固，AST 是 2h 工作量 |
+| 2.2 | WebSocket 增量发送 | 测试已写，实现待补 |
+| 2.3 | 目录缓存 | 测试 xfail，实现待补 |
+| 3.1-3.4 | 虚拟滚动/高亮防抖/Docker/httpOnly | P3 优先级低 |
+
+### 测试统计
+
+- 后端 **411** 通过（+49）
+- 前端 **103** 通过（+2）
+- **合计 514**
+
+### 修改文件（27 个，+671/-92 行）
+
+后端源码 12 个 + 后端测试 10 个 + 前端 2 个 + 配置 1 个 + .gitignore
+
+---
+
+## Phase 81：运行时 Bug 修复（2026-06-23）
+
+**来源：** 真实运行测试（计算器项目）
+
+### Bug 1：API Key 读取失败
+
+**现象：** 设置页面保存了 API Key，但 LLM 调用报 401 `Authentication Fails, Your api key: ****here is invalid`
+**根因：** settings 页面把 key 存到 `data/.api_key` 文件，但 `_create_llm()` 只从 `data/settings.json` 读（设计上故意排除 key）
+**修复：** `_create_llm()` 增加 `.api_key` 文件读取路径
+**文件：** `utils/llm.py`
+
+### Bug 2：安全检查拦截正常 import
+
+**现象：** Developer 写的代码含 `import httpx` 或 `import requests`，tool_executor 报 `ValueError: 代码包含不允许的模式`
+**根因：** `_DANGEROUS_PATTERNS` 包含 `import requests`、`import httpx`、`import socket`、`import urllib`，这些是正常第三方/标准库
+**修复：** 从危险模式中移除，只保留 `import subprocess`、`os.system`、`eval`、`exec` 等真正危险操作
+**文件：** `agents/tool_executor.py`
+
+### Bug 3：Tester had_execution_errors 误判
+
+**现象：** Tester 输出 "32 passed, 0 failed" 但 `test_passed=False`
+**根因：** pytest 输出到 stderr 时 `returncode != 0`（如 pytest warnings），`had_execution_errors=True` 直接跳过结果解析
+**修复：** 只在 stdout/stderr 不含 "passed"/"failed" 时才标记为执行错误
+**文件：** `agents/tester.py`
+
+### Bug 4：KeyError 'human_confirm'
+
+**现象：** Developer max retries 后报 `KeyError: 'human_confirm'`，图崩溃
+**根因：** `route_after_developer` 返回 `"human_confirm"`，但 developer 条件边映射只有 `"tester"`/`"developer"`/`END`
+**修复：** 添加 `"human_confirm": "human_confirm"` 到 developer 条件边
+**文件：** `agents/graph.py`
+
+### 测试
+
+- 后端 411 通过
+- 前端 103 通过
+- **合计 514**

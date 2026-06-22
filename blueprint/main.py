@@ -23,10 +23,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Blueprint", lifespan=lifespan)
 
-# CORS middleware
+# CORS middleware — origins read from config (default: localhost only)
+from blueprint.config import settings as _cfg
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cfg.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

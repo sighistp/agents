@@ -1,6 +1,9 @@
 import contextvars
+import logging
 import threading
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 PRICING = {"input": 0.27, "output": 1.10}
 
@@ -34,8 +37,8 @@ class CostTracker:
                 data["total_input_tokens"] += input_tokens
                 data["total_output_tokens"] += output_tokens
                 data["estimated_cost_usd"] = round(data["total_input_tokens"] / 1_000_000 * PRICING["input"] + data["total_output_tokens"] / 1_000_000 * PRICING["output"], 6)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to record cost: %s", e, exc_info=True)
 
     def get_cost(self, project_id: str) -> dict:
         with self._lock:
