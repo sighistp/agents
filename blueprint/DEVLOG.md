@@ -4069,3 +4069,67 @@ deliver_node → 写文件 → meta.json → hook 链:
 - 后端 411 通过
 - 前端 103 通过
 - **合计 514**
+
+---
+
+## Phase 81b：test_passed 误判 + Developer 文件丢失（2026-06-23）
+
+**来源：** 真实运行测试（计算器项目，第二轮）
+
+### Bug 1：test_passed=False 但 "50 passed, 0 failed"
+
+**现象：** Tester 输出 "50 passed, 0 failed" 但 `test_passed=False`
+**根因：** `had_execution_errors` 是 sticky 的 — Tester 先运行了非测试代码（如 `python calculator_engine.py`），execute_python 返回非零且 stdout 不含 "passed"/"failed"，`had_execution_errors=True`。之后 pytest 成功运行（"50 passed"），但 flag 没重置，`_extract_test_passed` 直接返回 False。
+**修复：** 每次 execute_python 成功后重置 `had_execution_errors=False`
+**文件：** `agents/tester.py`
+
+### Bug 2：Developer 迭代后文件消失
+
+**现象：** 第一次 Developer 写了 5 个文件，第二次只写了 3 个，前端文件面板只剩 3 个
+**根因：** Developer 返回 `"files": files_written`（只含本次写入的文件）。LangGraph 的 state 合并是**补丁式替换**，不是 deep merge — `files` 字段被整体替换为只有 3 个文件，之前的 2 个丢了。
+**修复：** 所有返回路径改为 `"files": {**state.get("files", {}), **files_written}`，合并旧文件和新文件
+**文件：** `agents/developer.py`
+
+### 测试
+
+- 后端 411 通过
+- 前端 103 通过
+- **合计 514**
+
+---
+
+## 技术反思：LangGraph 框架评估
+
+> 基于 Blueprint 项目 80+ 个 Phase 的实战经验
+
+### 坑点
+
+| # | 问题 | 影响 |
+|---|------|------|
+| 1 | **State 合并是补丁式替换** — 不是 deep merge，dict 字段会被整体替换 | Developer 的 files 就是这么丢的（Phase 81b） |
+| 2 | **sync/async 混乱** — Agent 节点是 async，`create_graph()` 是 sync，SqliteSaver 需要 async init | 三者互相打架，SqliteSaver 至今无法使用（Phase 69） |
+| 3 | **interrupt/resume 强制依赖 checkpointer** — MemorySaver 重启丢状态，SqliteSaver 不支持 async | 卡在中间，只能用 MemorySaver（Phase 69） |
+| 4 | **路由函数和条件边映射是两套系统** — 路由函数返回字符串，但必须在 `add_conditional_edges` 里手动映射 | 漏了一个 key 就 KeyError（Phase 81） |
+| 5 | **调试困难** — 图执行时看不到中间状态 | 出错了只知道"某个节点崩了"，排查靠猜 |
+
+### 优点
+
+| # | 优势 | 说明 |
+|---|------|------|
+| 1 | **图结构适合多 Agent 编排** | 条件分支、循环、interrupt 天然支持 |
+| 2 | **Checkpoint 机制设计不错** | 只是实现有坑（async 兼容性） |
+| 3 | **LangChain 生态集成** | ChatOpenAI、工具绑定、Pydantic 输出无缝对接 |
+
+### 如果重新选
+
+| 方案 | 适用场景 | 说明 |
+|------|---------|------|
+| **asyncio 手写状态机** | 5 Agent + 几个路由函数的规模 | 手写反而更清晰可控，没有抽象层的坑 |
+| **AutoGen** | 侧重 Agent 对话 | 微软出品，GroupChat 模式适合多 Agent 讨论 |
+| **自造轮子** | 需要完全控制 | `async def run_pipeline()` + 状态 dict，比 LangGraph 少很多坑 |
+
+### 结论
+
+LangGraph 不是落后，是**抽象层太厚**。对于 Blueprint 这种需要精细控制 state 合并、sync/async 混用、interrupt/resume 的场景，LangGraph 的抽象反而成了障碍。但对于更简单的线性流程（PM→Architect→Developer→Tester→Reviewer），它还是够用的。
+
+**当前建议：** 不换框架，遇到坑就修。项目已经跑了 514 个测试，核心链路通了，换框架成本远高于修坑成本。
