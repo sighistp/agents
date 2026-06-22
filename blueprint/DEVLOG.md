@@ -3942,3 +3942,19 @@ deliver_node → 写文件 → meta.json → hook 链:
 - 后端 362 通过
 - 前端 101 通过
 - **合计 463**
+
+---
+
+## Phase 79：Webhook 设置页面（2026-06-19）
+
+### 实现
+
+- SettingsPage 新增 Webhook 管理 UI（列表 + 添加 + 删除）
+- 后端 API 已有（GET/POST/DELETE /api/settings/webhooks）
+- 前端调用 api 模块（getWebhooks/addWebhook/deleteWebhook）
+
+### 测试
+
+- 后端 362 通过
+- 前端 101 通过
+- **合计 463**
