@@ -114,7 +114,11 @@ class ProjectMemory:
 
         Only accepts whitelisted column names (C1 fix).
         """
-        # C1: Whitelist validation
+        # C1: Whitelist validation — column names come from _SNAPSHOT_COLUMNS,
+        # values are parameterized (?). This is safe because:
+        # 1. Only whitelisted column names are allowed
+        # 2. Values use parameterized queries (? placeholders)
+        # 3. SQLite doesn't support parameterized column names, so dynamic SQL is necessary
         invalid = set(kwargs.keys()) - _SNAPSHOT_COLUMNS
         if invalid:
             raise ValueError(f"Invalid snapshot columns: {invalid}")

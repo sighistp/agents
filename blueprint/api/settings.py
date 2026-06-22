@@ -1,10 +1,12 @@
 """Settings API for Blueprint configuration.
 
 Includes API preset management for saving and switching between LLM configs.
+API key is stored in a separate file with restricted permissions (0o600).
 """
 
 import json
 import os
+import stat
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -15,6 +17,7 @@ router = APIRouter(prefix="/api", tags=["settings"])
 # File paths
 SETTINGS_FILE = Path(__file__).parent.parent / "data" / "settings.json"
 PRESETS_FILE = Path(__file__).parent.parent / "data" / "api_presets.json"
+API_KEY_FILE = Path(__file__).parent.parent / "data" / ".api_key"
 
 
 class SettingsUpdate(BaseModel):
@@ -42,6 +45,27 @@ _DEFAULTS = {
 }
 
 
+def _load_api_key() -> str:
+    """Load API key from secure file."""
+    if API_KEY_FILE.exists():
+        try:
+            return API_KEY_FILE.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+    return ""
+
+
+def _save_api_key(key: str) -> None:
+    """Save API key to secure file with restricted permissions."""
+    API_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    API_KEY_FILE.write_text(key, encoding="utf-8")
+    # Restrict file permissions (owner read/write only)
+    try:
+        os.chmod(str(API_KEY_FILE), stat.S_IRUSR | stat.S_IWUSR)
+    except Exception:
+        pass  # Windows doesn't support chmod
+
+
 def _load_settings() -> dict:
     """Load settings from file, merged with defaults."""
     settings = _DEFAULTS.copy()
@@ -51,14 +75,18 @@ def _load_settings() -> dict:
             settings.update(file_settings)
         except (json.JSONDecodeError, IOError):
             pass
+    # Load API key from secure file (not from settings.json)
+    settings["api_key"] = _load_api_key()
     return settings
 
 
 def _save_settings(settings: dict) -> None:
-    """Save settings to file with atomic write."""
+    """Save settings to file with atomic write (excludes api_key)."""
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # Don't save api_key to settings.json — it's in a separate secure file
+    to_save = {k: v for k, v in settings.items() if k != "api_key"}
     tmp_path = SETTINGS_FILE.with_suffix(".tmp")
-    tmp_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_path.write_text(json.dumps(to_save, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(str(tmp_path), str(SETTINGS_FILE))
 
 
@@ -99,7 +127,7 @@ def update_settings(req: SettingsUpdate):
     current = _load_settings()
 
     if req.api_key is not None:
-        current["api_key"] = req.api_key
+        _save_api_key(req.api_key)  # Save to secure file
     if req.base_url is not None:
         current["base_url"] = req.base_url
     if req.model is not None:
