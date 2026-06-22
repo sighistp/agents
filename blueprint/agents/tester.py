@@ -75,31 +75,50 @@ def build_tester_messages(state: dict) -> list[dict]:
 
 
 def _extract_test_passed(summary: str, had_execution_errors: bool) -> bool:
-    """Extract test result using structured regex parsing."""
+    """Extract test result using structured regex parsing.
+
+    Supports both English and Chinese test output.
+    """
     if had_execution_errors:
         return False
 
     import re
     summary_lower = summary.lower()
 
+    # English patterns
     passed_match = re.search(r'(\d+)\s*passed', summary_lower)
     failed_match = re.search(r'(\d+)\s*failed', summary_lower)
-    error_match = re.search(r'(\d+)\s*error', summary_lower)
+    error_match = re.search(r'(\d+)\s*error(?:s)?(?!\w)', summary_lower)
 
+    # Chinese patterns: "N 个测试通过", "N 通过", "N 失败", "N 个失败"
+    zh_passed = re.search(r'(\d+)\s*(?:个)?(?:测试)?通过', summary)
+    zh_failed = re.search(r'(\d+)\s*(?:个)?失败', summary)
+
+    # Check failures first (any language)
     if failed_match and int(failed_match.group(1)) > 0:
+        return False
+    if zh_failed and int(zh_failed.group(1)) > 0:
         return False
     if error_match and int(error_match.group(1)) > 0:
         return False
+
+    # Check passes (any language)
     if passed_match and int(passed_match.group(1)) > 0:
         return True
+    if zh_passed and int(zh_passed.group(1)) > 0:
+        return True
 
-    pass_keywords = ["全部通过", "all passed", "all tests passed",
-                     "0 fail", "0 error", "0失败", "0 failed"]
+    # Keyword fallback (both languages)
+    pass_keywords = [
+        "全部通过", "all passed", "all tests passed",
+        "0 fail", "0 error", "0失败", "0 failed",
+        "测试通过", "tests passed",
+    ]
     for kw in pass_keywords:
         if kw in summary_lower:
             return True
 
-    return False  # P2.4: No pattern matched → default to False (safe assumption)
+    return False  # No pattern matched → default to False (safe assumption)
 
 async def tester_agent(state: dict) -> dict[str, Any]:
     """Tester agent: tool-loop based testing.

@@ -217,7 +217,8 @@ def _run_linter(args: dict, project_dir: str) -> str:
         import subprocess
         result = subprocess.run(
             ["ruff", "check", "--output-format=json", path],
-            capture_output=True, text=True, timeout=15
+            capture_output=True, text=True, timeout=15,
+            encoding="utf-8", errors="replace"
         )
         issues = json.loads(result.stdout) if result.stdout.strip() else []
         return json.dumps({
