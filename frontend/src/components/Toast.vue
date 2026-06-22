@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="toast-container">
     <TransitionGroup name="toast">
       <div
@@ -8,8 +8,8 @@
         :class="`toast-${n.type}`"
         @click="remove(n.id)"
       >
-        <span class="toast-icon">{{ icons[n.type] }}</span>
-        <span class="toast-message">{{ n.message }}</span>
+      <component :is="iconMap[n.type]" :size="14" />
+      <span class="toast-message">{{ n.message }}</span>
       </div>
     </TransitionGroup>
   </div>
@@ -17,14 +17,15 @@
 
 <script setup>
 import { useNotification } from '../composables/useNotification.js'
+import { Check, X, AlertTriangle, Info } from '@lucide/vue'
 
 const { notifications, remove } = useNotification()
 
-const icons = {
-  success: '✅',
-  error: '❌',
-  warning: '⚠️',
-  info: 'ℹ️',
+const iconMap = {
+  success: Check,
+  error: X,
+  warning: AlertTriangle,
+  info: Info,
 }
 </script>
 

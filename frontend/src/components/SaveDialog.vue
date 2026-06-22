@@ -1,8 +1,8 @@
-﻿<!-- frontend/src/components/SaveDialog.vue -->
+<!-- frontend/src/components/SaveDialog.vue -->
 <template>
-  <div v-if="visible" class="save-overlay" @click.self="cancel">
-    <div class="save-dialog">
-      <div class="dialog-title">💾 保存项目</div>
+  <div class="dialog-overlay" v-if="visible">
+    <div class="dialog">
+      <div class="dialog-title"><Save :size="16" /> 保存项目</div>
       <div class="dialog-label">项目名称</div>
       <input
         v-model="name"
@@ -23,6 +23,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { Save } from '@lucide/vue'
 
 const props = defineProps({
   visible: Boolean,
