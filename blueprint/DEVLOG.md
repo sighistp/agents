@@ -3809,3 +3809,67 @@ deliver_node → 写文件 → meta.json → hook 链:
 - 后端 362 通过
 - 前端 101 通过
 - **合计 463**
+
+---
+
+## Phase 75：后端 Critical 修复 + 前端 API 错误处理 + 颜色批量替换（2026-06-19）
+
+### 后端 Critical 修复
+
+| # | 问题 | 修复 |
+|---|------|------|
+| C1 | .BLUEPRINT_secret 大小写不匹配 .gitignore | .gitignore 加 `.BLUEPRINT_secret` + `.devteam_secret` + `*.secret` |
+| C5 | websocket.py 限流器无线程锁 | 加 `threading.Lock` + `with` 上下文管理器 |
+
+### 前端 API 错误处理修复
+
+| 修复 | 文件 |
+|------|------|
+| downloadProject 加 auth token（window.open） | api/index.js |
+| exportProject 加 auth token（window.open） | api/index.js |
+| 新增 presets/webhooks API 方法 | api/index.js |
+| SettingsPage 4 个 raw fetch → api 模块 | SettingsPage.vue |
+
+### 前端硬编码颜色批量修复
+
+| 修复 | 数量 |
+|------|------|
+| CSS 硬编码 hex → CSS 变量 | ~40 处（18 个文件） |
+| IterationInfo JS Material 颜色 → CSS 类 | 3 处 |
+| main.css 新增变量 | 5 个（--success-bg / --error-bg / --warning-bg / --info-bg / --text-inverse） |
+
+### 测试
+
+- 后端 362 通过
+- 前端 101 通过
+- **合计 463**
+
+---
+
+## Phase 76：全线代码审查 + 前端专项审查（2026-06-19）
+
+### 后端审查
+
+| 级别 | 数量 | 已修复 |
+|------|------|--------|
+| Critical | 5 | 2（C1 gitignore + C5 限流器） |
+| Important | 7 | 待修复 |
+| Minor | 6 | 待修复 |
+
+### 前端专项审查
+
+| 问题 | 数量 | 已修复 |
+|------|------|--------|
+| 硬编码 CSS 颜色 | ~40 处 | ✅ 全部替换 |
+| JS 硬编码颜色 | 3 处（IterationInfo） | ✅ 改为 CSS 类 |
+| ChatPanel JS colorMap | 1 处 | ⏸ 待修复 |
+| Store 反模式 | 5 个 | ⏸ 待修复 |
+| API 错误处理 | 6 个 | ✅ 已修复（download/export/presets） |
+| Emoji 做图标 | ~60 处 | ⏸ 待引入 Lucide |
+| 组件超 200 行 | 2 个 | ⏸ 待拆分 |
+
+### 测试
+
+- 后端 362 通过
+- 前端 101 通过
+- **合计 463**
