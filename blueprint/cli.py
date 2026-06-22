@@ -7,7 +7,8 @@ import click
 
 
 def _projects_dir() -> Path:
-    return Path("projects")
+    from blueprint.config import settings
+    return Path(settings.project_dir) if settings.project_dir else Path("projects")
 
 
 @click.group()

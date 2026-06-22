@@ -3873,3 +3873,47 @@ deliver_node → 写文件 → meta.json → hook 链:
 - 后端 362 通过
 - 前端 101 通过
 - **合计 463**
+
+---
+
+## Phase 77：后端 Critical 全部修复 + 前端安全加固（2026-06-19）
+
+### 后端 Critical 修复（5/5 ✅）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| C1 | .BLUEPRINT_secret 大小写 + .devteam_secret 无条目 | .gitignore 加 3 个条目 |
+| C2 | 无 CORS | main.py 加 CORSMiddleware |
+| C3 | settings.json 明文 API key | API key 独立文件 + 0o600 权限 |
+| C4 | SQL 动态拼接 | 已有白名单，加注释说明安全性 |
+| C5 | 限流器无线程锁 | 加 threading.Lock |
+
+### 后端 Important 修复（7/7 ✅）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| I2 | reviewer.py 重复变量 | 删除重复声明 |
+| I3 | requirements.txt 不完整 | 加 httpx/click/langgraph-checkpoint-sqlite |
+| I4 | memory.py 无效 try/except | 移除 except raise |
+| I6 | cost_tracker get_cost 无锁 | 加 self._lock |
+| I7 | llm.py 模块级 sys.path | 改为本地 retry 装饰器 |
+
+### 前端安全修复
+
+| 修复 | 文件 |
+|------|------|
+| window.open 加 noopener,noreferrer | api/index.js |
+| URL 参数 encodeURIComponent | api/index.js（所有路径参数） |
+| 移除多余 window.open | ProjectDetailPage.vue |
+
+### 前端 Minor 修复
+
+| 修复 | 文件 |
+|------|------|
+| cli.py 相对路径改用 config | cli.py |
+
+### 测试
+
+- 后端 362 通过
+- 前端 101 通过
+- **合计 463**
