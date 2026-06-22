@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="chat-panel">
     <ChatHeader
       @pause="send({ type: 'pause' })"
@@ -26,7 +26,7 @@
           <div class="msg-avatar">{{ avatar(msg.name || msg.role) }}</div>
           <div class="msg-body">
             <div class="msg-header">
-              <span class="msg-name" :style="{ color: color(msg.name) }">{{ label(msg.name) }}</span>
+              <span class="msg-name" :class="colorClass(msg.name)">{{ label(msg.name) }}</span>
               <span class="msg-time">{{ time(msg.timestamp) }}</span>
               <button v-if="msg.name === 'user'" class="btn-retry" @click="retryMessage(msg.content)" title="重试">🔄</button>
             </div>
@@ -62,11 +62,11 @@ const messagesRef = ref(null)
 const saveError = ref('')
 
 const avatarMap = { pm: '👤', architect: '🏗️', developer: '💻', tester: '🧪', reviewer: '🔍', system: '🤖', user: '👤', pm_proposer: '👤', pm_critic: '🔍', arch_proposer: '🏗️', arch_critic: '🔍', developer_critic: '🔍' }
-const colorMap = { pm: '#3B82F6', architect: '#8B5CF6', developer: '#10B981', tester: '#F59E0B', reviewer: '#EC4899', system: '#6B7280', user: '#3B82F6', pm_proposer: '#3B82F6', pm_critic: '#EC4899', arch_proposer: '#8B5CF6', arch_critic: '#EC4899', developer_critic: '#EC4899' }
+const colorClassMap = { pm: 'color-pm', architect: 'color-architect', developer: 'color-developer', tester: 'color-tester', reviewer: 'color-reviewer', system: 'color-system', user: 'color-user', pm_proposer: 'color-pm', pm_critic: 'color-reviewer', arch_proposer: 'color-architect', arch_critic: 'color-reviewer', developer_critic: 'color-reviewer' }
 const labelMap = { pm: 'PM', architect: '架构师', developer: '开发者', tester: '测试员', reviewer: '审查员', system: '系统', user: '用户', pm_proposer: 'PM·方案', pm_critic: 'PM·审查', arch_proposer: '架构师·方案', arch_critic: '架构师·审查', developer_critic: '开发·审查' }
 
 function avatar(name) { return avatarMap[name] || '🤖' }
-function color(name) { return colorMap[name] || '#6B7280' }
+function colorClass(name) { return colorClassMap[name] || 'color-system' }
 function label(name) { return labelMap[name] || name }
 function time(ts) { return ts ? new Date(ts).toLocaleTimeString() : '' }
 
@@ -199,4 +199,11 @@ watch(() => projectStore.messages.length, () => {
 .chat-input textarea:focus { outline: none; border-color: var(--primary); }
 .chat-input button { width: 40px; height: 40px; border-radius: var(--radius); background: var(--primary); color: #fff; border: none; cursor: pointer; font-size: 16px; }
 .chat-input button:disabled { opacity: 0.4; cursor: not-allowed; }
+.color-pm { color: var(--primary); }
+.color-architect { color: #8B5CF6; }
+.color-developer { color: var(--success); }
+.color-tester { color: var(--warning); }
+.color-reviewer { color: #EC4899; }
+.color-system { color: var(--text-dim); }
+.color-user { color: var(--primary); }
 </style>
