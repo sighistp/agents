@@ -15,7 +15,12 @@
       @save="handleSave"
     />
     <div class="messages" ref="messagesRef">
-      <div v-for="(msg, i) in projectStore.messages" :key="i" :class="['message', `msg-${msg.name || msg.role}`]">
+      <!-- 精简/全量切换 -->
+      <div v-if="projectStore.currentProject?.id" class="view-toggle">
+        <button :class="{ active: viewMode === 'brief' }" @click="switchView('brief')">精简</button>
+        <button :class="{ active: viewMode === 'full' }" @click="switchView('full')">全量</button>
+      </div>
+      <div v-for="(msg, i) in displayMessages" :key="i" :class="['message', `msg-${msg.name || msg.role}`]">
         <!-- Agent 结构化输出卡片 -->
         <AgentOutputCard
           v-if="isAgentMessage(msg)"
@@ -43,9 +48,10 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useProjectStore } from '../stores/project.js'
 import { useWebSocket, setActiveProject } from '../composables/useWebSocket.js'
+import { api } from '../api/index.js'
 import ChatHeader from './ChatHeader.vue'
 import SaveDialog from './SaveDialog.vue'
 import AgentOutputCard from './AgentOutputCard.vue'
@@ -60,6 +66,41 @@ const { send } = useWebSocket()
 const inputText = ref('')
 const messagesRef = ref(null)
 const saveError = ref('')
+
+// 精简/全量切换
+const viewMode = ref('brief')  // 'brief' | 'full'
+const fullMessages = ref([])
+
+const displayMessages = computed(() => {
+  if (viewMode.value === 'full') return fullMessages.value
+  return projectStore.messages
+})
+
+async function switchView(mode) {
+  viewMode.value = mode
+  if (mode === 'full') {
+    const projectId = projectStore.currentProject?.id
+    if (projectId) {
+      try {
+        const data = await api.getProjectConversations(projectId)
+        // Flatten conversations into message list
+        const msgs = []
+        if (data?.conversations) {
+          for (const conv of data.conversations) {
+            msgs.push({ role: 'system', name: conv.agent_name, content: `--- ${conv.agent_name} (迭代 ${conv.iteration}) ---`, timestamp: conv.created_at })
+            for (const m of (conv.messages || [])) {
+              msgs.push({ role: m.role, name: m.name || conv.agent_name, content: m.content || '', timestamp: conv.created_at })
+            }
+          }
+        }
+        fullMessages.value = msgs
+      } catch (e) {
+        console.error('Failed to load conversations:', e)
+        fullMessages.value = [{ role: 'system', name: 'system', content: '加载全量对话失败' }]
+      }
+    }
+  }
+}
 
 const avatarMap = { pm: '👤', architect: '🏗️', developer: '💻', tester: '🧪', reviewer: '🔍', system: '🤖', user: '👤', pm_proposer: '👤', pm_critic: '🔍', arch_proposer: '🏗️', arch_critic: '🔍', developer_critic: '🔍' }
 const colorClassMap = { pm: 'color-pm', architect: 'color-architect', developer: 'color-developer', tester: 'color-tester', reviewer: 'color-reviewer', system: 'color-system', user: 'color-user', pm_proposer: 'color-pm', pm_critic: 'color-reviewer', arch_proposer: 'color-architect', arch_critic: 'color-reviewer', developer_critic: 'color-reviewer' }
@@ -185,6 +226,10 @@ watch(() => projectStore.messages.length, () => {
 .btn-retry { background: none; border: none; cursor: pointer; font-size: 12px; opacity: 0; transition: opacity 0.15s; padding: 0 4px; }
 .message:hover .btn-retry { opacity: 0.6; }
 .btn-retry:hover { opacity: 1; }
+.view-toggle { display: flex; gap: 4px; padding: 0 16px 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.view-toggle button { padding: 4px 12px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-panel); color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+.view-toggle button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.view-toggle button:hover:not(.active) { background: var(--bg-hover, rgba(128,128,128,0.1)); }
 .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .message { display: flex; gap: 10px; }
 .msg-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-panel); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; border: 1px solid var(--border); }
