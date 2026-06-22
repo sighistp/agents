@@ -2,6 +2,10 @@
   <div class="projects-page">
     <h2>项目列表</h2>
     <div v-if="loading" class="loading">加载中...</div>
+    <div v-else-if="error" class="error">
+      <p>{{ error }}</p>
+      <button @click="loadProjects">重试</button>
+    </div>
     <div v-else-if="projects.length === 0" class="empty">暂无项目</div>
     <div v-else class="projects-grid">
       <div v-for="p in projects" :key="p.project_id" class="project-card" @click="$router.push(`/projects/${p.project_id}`)">
@@ -19,16 +23,24 @@ import { api } from '../api/index.js'
 
 const projects = ref([])
 const loading = ref(true)
+const error = ref(null)
 
-onMounted(async () => {
-  try { projects.value = await api.getProjects() } catch (e) { console.error(e) }
+async function loadProjects() {
+  loading.value = true
+  error.value = null
+  try { projects.value = await api.getProjects() }
+  catch (e) { error.value = e.message || '加载失败' }
   finally { loading.value = false }
-})
+}
+
+onMounted(loadProjects)
 
 async function remove(id) {
   if (!confirm('确定删除？')) return
-  await api.deleteProject(id)
-  projects.value = projects.value.filter(p => p.project_id !== id)
+  try {
+    await api.deleteProject(id)
+    projects.value = projects.value.filter(p => p.project_id !== id)
+  } catch (e) { alert('删除失败: ' + (e.message || '未知错误')) }
 }
 </script>
 
