@@ -44,6 +44,21 @@
           </div>
         </div>
 
+        <!-- Webhook 配置 -->
+        <div class="section-title">Webhook 通知</div>
+        <div class="webhook-list">
+          <div v-for="(wh, i) in webhooks" :key="i" class="webhook-item">
+            <span class="webhook-url">{{ wh.url }}</span>
+            <span class="webhook-events">{{ wh.events?.join(', ') || '*' }}</span>
+            <button type="button" class="btn-sm btn-danger" @click="deleteWebhook(i)">删除</button>
+          </div>
+          <div v-if="webhooks.length === 0" class="empty-hint">暂无 Webhook</div>
+        </div>
+        <div class="webhook-add">
+          <input v-model="newWebhookUrl" type="url" placeholder="http://your-server/hook" class="webhook-input" />
+          <button type="button" class="btn-sm" @click="addWebhook" :disabled="!newWebhookUrl">添加</button>
+        </div>
+
         <p v-if="message" :class="['msg', success ? 'success' : 'error']">{{ message }}</p>
         <div class="actions">
           <button type="button" class="btn-secondary" @click="$router.push('/')">返回</button>
@@ -65,6 +80,8 @@ const success = ref(false)
 const presets = ref({})
 const selectedPreset = ref('')
 const newPresetName = ref('')
+const webhooks = ref([])
+const newWebhookUrl = ref('')
 
 onMounted(async () => {
   try {
@@ -72,6 +89,7 @@ onMounted(async () => {
     form.value = { ...form.value, ...data }
   } catch (e) { message.value = '加载设置失败' }
   loadPresets()
+  loadWebhooks()
 })
 
 async function loadPresets() {
@@ -120,6 +138,28 @@ async function deletePreset() {
     loadPresets()
   } catch (e) { message.value = e.message; success.value = false }
 }
+
+async function loadWebhooks() {
+  try { webhooks.value = (await api.getWebhooks()).webhooks || [] }
+  catch {}
+}
+
+async function addWebhook() {
+  if (!newWebhookUrl.value) return
+  try {
+    await api.addWebhook({ url: newWebhookUrl.value, events: ['project.completed'] })
+    newWebhookUrl.value = ''
+    loadWebhooks()
+    message.value = 'Webhook 已添加'; success.value = true
+  } catch (e) { message.value = e.message; success.value = false }
+}
+
+async function deleteWebhook(index) {
+  try {
+    await api.deleteWebhook(index)
+    loadWebhooks()
+  } catch (e) { message.value = e.message; success.value = false }
+}
 </script>
 
 <style scoped>
@@ -146,6 +186,13 @@ async function deletePreset() {
 .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-danger { border-color: var(--error); color: var(--error); }
 .btn-danger:hover { background: rgba(239,68,68,0.1); }
+.webhook-list { margin-bottom: 8px; }
+.webhook-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.webhook-url { flex: 1; color: var(--text); font-family: monospace; }
+.webhook-events { color: var(--text-dim); }
+.empty-hint { color: var(--text-dim); font-size: 12px; }
+.webhook-add { display: flex; gap: 8px; }
+.webhook-input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; }
 .preset-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .preset-select { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-input); color: var(--text); font-size: 13px; }
 .preset-name-input { width: 120px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; }
