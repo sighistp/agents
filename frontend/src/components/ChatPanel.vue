@@ -67,8 +67,8 @@ const inputText = ref('')
 const messagesRef = ref(null)
 const saveError = ref('')
 
-// 精简/全量切换
-const viewMode = ref('brief')  // 'brief' | 'full'
+// 精简/全量切换（持久化到 localStorage）
+const viewMode = ref(localStorage.getItem('chatViewMode') || 'brief')
 const fullMessages = ref([])
 
 const displayMessages = computed(() => {
@@ -78,6 +78,7 @@ const displayMessages = computed(() => {
 
 async function switchView(mode) {
   viewMode.value = mode
+  localStorage.setItem('chatViewMode', mode)
   if (mode === 'full') {
     const projectId = projectStore.currentProject?.id
     if (projectId) {
