@@ -3933,9 +3933,9 @@ deliver_node → 写文件 → meta.json → hook 链:
 
 | 问题 | 说明 |
 |------|------|
-| Store 反模式 | websocket.js 外部修改状态、project.js 绕过 API |
-| 60+ emoji 图标 | 需引入 Lucide Icons 替换 |
-| 组件超 200 行 | ChatPanel(202)/ProjectLogPanel(226) 拆分 |
+| Store 反模式 | ✅ websocket.js actions + project.js 用 api 模块 |
+| 60+ emoji 图标 | ⏸ 待引入 Lucide Icons |
+| 组件超 200 行 | ⏸ ChatPanel(202)/ProjectLogPanel(226) 拆分 |
 
 ### 测试
 
