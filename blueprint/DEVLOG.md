@@ -4133,3 +4133,106 @@ deliver_node → 写文件 → meta.json → hook 链:
 LangGraph 不是落后，是**抽象层太厚**。对于 Blueprint 这种需要精细控制 state 合并、sync/async 混用、interrupt/resume 的场景，LangGraph 的抽象反而成了障碍。但对于更简单的线性流程（PM→Architect→Developer→Tester→Reviewer），它还是够用的。
 
 **当前建议：** 不换框架，遇到坑就修。项目已经跑了 514 个测试，核心链路通了，换框架成本远高于修坑成本。
+
+---
+
+## Phase 81b：test_passed 误判 + Developer 文件丢失（2026-06-23）
+
+**来源：** 真实运行测试（计算器项目，第二轮）
+
+### Bug 1：had_execution_errors sticky 导致 test_passed=False
+
+**现象：** Tester 输出 "50 passed, 0 failed" 但 `test_passed=False`
+**根因：** `had_execution_errors` 是 sticky 的 — Tester 先运行了非测试代码（如 `python calculator_engine.py`），execute_python 返回非零且 stdout 不含 "passed"/"failed"，`had_execution_errors=True`。之后 pytest 成功运行（"50 passed"），但 flag 没重置。
+**修复：** 每次 execute_python 成功后重置 `had_execution_errors=False`
+**文件：** `agents/tester.py`
+
+### Bug 2：Developer 迭代后文件消失
+
+**现象：** 第一次 Developer 写了 5 个文件，第二次只写了 3 个，前端文件面板只剩 3 个
+**根因：** Developer 返回 `"files": files_written`（只含本次写入的文件）。LangGraph 的 state 合并是**补丁式替换**，不是 deep merge — `files` 字段被整体替换为只有 3 个文件，之前的 2 个丢了。
+**修复：** 所有返回路径改为 `"files": {**state.get("files", {}), **files_written}`，合并旧文件和新文件
+**文件：** `agents/developer.py`
+
+### 测试
+
+- 后端 411 通过
+- 前端 103 通过
+- **合计 514**
+
+---
+
+## Phase 81c：中文测试摘要解析 + GBK 编码修复（2026-06-23）
+
+**来源：** 真实运行测试（计算器项目，第三轮）
+
+### Bug 1：test_passed=False 但 "27 个测试通过，0 个失败"
+
+**现象：** Tester 输出中文摘要 "✅ 全部 27 个测试通过，0 个失败"，但 `test_passed=False`
+**根因：** `_extract_test_passed` 的正则只匹配英文 `(\d+)\s*passed` / `(\d+)\s*failed`。LLM 输出中文 "通过"/"失败" 时完全匹配不上，fallback 关键词 "全部通过" 也匹配不上（实际文本是 "全部 27 个测试通过"，中间隔了字）。
+**修复：** 新增中文正则 `(\d+)\s*(?:个)?(?:测试)?通过` / `(\d+)\s*(?:个)?失败` + 扩展关键词列表
+**文件：** `agents/tester.py`
+
+### Bug 2：UnicodeDecodeError in _run_linter
+
+**现象：** `UnicodeDecodeError: 'gbk' codec can't decode byte 0x88` 在 subprocess._readerthread
+**根因：** tool_executor.py 的 `_run_linter` 调用 `subprocess.run` 时没设 `encoding`，Windows 默认 GBK，中文内容解码失败
+**修复：** 添加 `encoding="utf-8", errors="replace"`
+**文件：** `agents/tool_executor.py`
+
+### 测试
+
+- 后端 411 通过
+- 前端 103 通过
+- **合计 514**
+
+---
+
+## Phase 81d：诊断日志 + has_test_output 中文支持（2026-06-23）
+
+**来源：** 系统化调试流程
+
+### 改动
+
+1. `_extract_test_passed` 入口加 `logger.warning` — 当 `had_execution_errors=True` 时打印 summary 前 100 字，便于定位根因
+2. `has_test_output` 检查增加中文关键词 `通过`/`失败` — 避免中文 pytest 输出被误判为执行错误
+3. execute_python 成功/失败路径加 `logger.info/warning` — 打印 rc 和 has_test_output 状态
+
+### 文件
+
+- `agents/tester.py`
+
+### 测试
+
+- 后端 411 通过
+- 前端 103 通过
+- **合计 514**
+
+---
+
+## Phase 82：通讯页面精简/全量切换（2026-06-23）
+
+**来源：** 用户反馈 — 刷新后通讯页面消息变少
+
+### 问题
+
+实时 WebSocket 发送 `agent_update`（多条消息 + 工具结果），但 SQLite `project_messages` 只存一条精简摘要。刷新后从 SQLite 恢复，消息变少。
+
+**设计回顾：** Phase 59 设计了三层存储（project_messages 精简 / agent_executions 结构化 / agent_conversations 全量），数据已全量存储，只是前端只读了精简层。
+
+### 实现
+
+- ChatPanel 顶部加 **「精简 | 全量」** 切换按钮
+- 精简模式：显示 `project_messages`（当前行为）
+- 全量模式：调用 `GET /api/projects/:id/conversations` 读取完整对话
+- 选择持久化到 `localStorage`，刷新后保持
+
+### 文件
+
+- `frontend/src/components/ChatPanel.vue`（+47 行）
+
+### 测试
+
+- 后端 411 通过
+- 前端 103 通过
+- **合计 514**
