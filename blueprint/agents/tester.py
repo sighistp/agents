@@ -80,6 +80,7 @@ def _extract_test_passed(summary: str, had_execution_errors: bool) -> bool:
     Supports both English and Chinese test output.
     """
     if had_execution_errors:
+        logger.warning(f"_extract_test_passed: had_execution_errors=True, returning False. Summary: {summary[:100]}")
         return False
 
     import re
@@ -197,17 +198,18 @@ async def tester_agent(state: dict) -> dict[str, Any]:
 
                 # Track execute_python failures
                 # Reset per-call so only the LAST execute_python matters for test_passed.
-                # Earlier calls (e.g. running non-test files) shouldn't poison the result.
                 if tool_name == "execute_python":
                     try:
                         exec_result = json.loads(result_str)
                         rc = exec_result.get("returncode", 0)
                         stdout = exec_result.get("stdout", "")
                         stderr = exec_result.get("stderr", "")
-                        if rc != 0 and "passed" not in stdout.lower() and "failed" not in stdout.lower():
+                        has_test_output = any(kw in stdout.lower() for kw in ["passed", "failed", "通过", "失败", "error"])
+                        if rc != 0 and not has_test_output:
                             had_execution_errors = True
+                            logger.warning(f"execute_python: rc={rc}, had_execution_errors=True (no test output)")
                         else:
-                            had_execution_errors = False  # Reset on successful execution
+                            had_execution_errors = False
                     except (json.JSONDecodeError, AttributeError):
                         pass
                 llm_messages.append({
