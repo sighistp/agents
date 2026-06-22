@@ -3934,7 +3934,7 @@ deliver_node → 写文件 → meta.json → hook 链:
 | 问题 | 说明 |
 |------|------|
 | Store 反模式 | ✅ websocket.js actions + project.js 用 api 模块 |
-| 60+ emoji 图标 | ⏸ 待引入 Lucide Icons |
+| 60+ emoji 图标 | ✅ 已安装 @lucide/vue + 创建 icons.js 常量，逐文件替换待下次会话 |
 | 组件超 200 行 | ⏸ ChatPanel(202)/ProjectLogPanel(226) 拆分 |
 
 ### 测试
