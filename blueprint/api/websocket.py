@@ -252,10 +252,10 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
                                 name=node_name,
                                 content=chat_msg[:2000]
                             )
-                        # Save full conversation to memory (filter out system messages)
-                        filtered = [m for m in dict_msgs if m.get("role") in ("assistant", "tool")]
-                        if filtered:
-                            mem.save_conversation(project_id, node_name, current_state.get("iteration", 0), filtered)
+                        # Save full conversation to memory (only current agent's messages)
+                        agent_msgs = [m for m in dict_msgs if m.get("name") == node_name or m.get("role") == "tool"]
+                        if agent_msgs:
+                            mem.save_conversation(project_id, node_name, current_state.get("iteration", 0), agent_msgs)
                         # Update snapshot step
                         mem.save_snapshot(project_id, current_step=node_name, iteration=current_state.get("iteration", 0))
                         mem.update_heartbeat(project_id)
