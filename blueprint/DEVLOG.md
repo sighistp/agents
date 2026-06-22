@@ -3917,3 +3917,28 @@ deliver_node → 写文件 → meta.json → hook 链:
 - 后端 362 通过
 - 前端 101 通过
 - **合计 463**
+
+---
+
+## Phase 78：前端剩余问题修复（2026-06-19）
+
+### 已修复
+
+| 问题 | 修复 |
+|------|------|
+| ChatPanel JS colorMap（12 处硬编码） | 改为 CSS 类 colorClassMap |
+| ProjectsPage 缺 error state | 加 error ref + loadProjects 函数 + 重试按钮 |
+
+### 待修复（下次会话）
+
+| 问题 | 说明 |
+|------|------|
+| Store 反模式 | websocket.js 外部修改状态、project.js 绕过 API |
+| 60+ emoji 图标 | 需引入 Lucide Icons 替换 |
+| 组件超 200 行 | ChatPanel(202)/ProjectLogPanel(226) 拆分 |
+
+### 测试
+
+- 后端 362 通过
+- 前端 101 通过
+- **合计 463**
