@@ -50,23 +50,18 @@ export const useProjectStore = defineStore('project', {
       this.messages.push({ ...msg, timestamp: Date.now() })
     },
     async saveProject(name) {
-      /** 保存当前项目到后端（upsert：已存在则更新） */
       if (!this.currentProject?.id) return false
       try {
-        const token = localStorage.getItem('token')
-        const res = await fetch('/api/projects', {
+        const { api } = await import('../api/index.js')
+        await api.request('/projects', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
           body: JSON.stringify({
             project_id: this.currentProject.id,
             requirement: this.currentProject.requirement || '',
             name: name || undefined,
           }),
         })
-        return res.ok
+        return true
       } catch (e) {
         console.error('Failed to save project:', e)
         return false
@@ -76,14 +71,9 @@ export const useProjectStore = defineStore('project', {
       this.agentStatus = { ...this.agentStatus, [agent]: status }
     },
     async restoreFromServer(projectId) {
-      /** Restore project state from backend after page refresh. */
       try {
-        const token = localStorage.getItem('token')
-        const res = await fetch(`/api/projects/${projectId}/state`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        if (!res.ok) return false
-        const data = await res.json()
+        const { api } = await import('../api/index.js')
+        const data = await api.getProjectState(projectId)
 
         this.currentProject = { id: projectId, requirement: data.requirement }
         this.iteration = data.iteration || 0

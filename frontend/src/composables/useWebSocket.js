@@ -131,10 +131,10 @@ export function useWebSocket() {
     ws = new WebSocket(`${protocol}//${location.host}/ws/project?token=${token}`)
 
     ws.onopen = () => {
-      wsStore.isConnected = true
-      wsStore.reconnecting = false
-      wsStore.lastError = null
-      reconnectDelay = 1000  // 连接成功后重置退避
+      wsStore.setConnected(true)
+      wsStore.setReconnecting(false)
+      wsStore.setError(null)
+      reconnectDelay = 1000
     }
 
     ws.onmessage = (e) => {
@@ -142,7 +142,7 @@ export function useWebSocket() {
     }
 
     ws.onclose = (e) => {
-      wsStore.isConnected = false
+      wsStore.setConnected(false)
       if (e.code === 4001) {
         authStore.clearAuth()
         router.push('/login')
@@ -154,13 +154,13 @@ export function useWebSocket() {
         router.push('/login')
         return
       }
-      wsStore.reconnecting = true
+      wsStore.setReconnecting(true)
       // 指数退避：1s → 2s → 4s → 8s → 16s → 30s
       reconnectTimer = setTimeout(connect, reconnectDelay)
       reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY)
     }
 
-    ws.onerror = () => { wsStore.lastError = 'WebSocket connection error' }
+    ws.onerror = () => { wsStore.setError('WebSocket connection error') }
   }
 
   function send(msg) {
