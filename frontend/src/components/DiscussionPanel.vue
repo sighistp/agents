@@ -1,7 +1,7 @@
 ﻿<template>
   <div v-if="discussionMessages.length > 0" class="discussion-panel">
     <div class="discussion-title" @click="expanded = !expanded">
-      💬 Proposer-Critic 讨论 ({{ discussionMessages.length }} 条)
+      ◇ Proposer-Critic 讨论 ({{ discussionMessages.length }} 条)
       <span>{{ expanded ? '收起' : '展开' }}</span>
     </div>
     <div v-if="expanded" class="discussion-body">

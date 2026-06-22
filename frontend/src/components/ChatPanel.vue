@@ -28,7 +28,7 @@
             <div class="msg-header">
               <span class="msg-name" :class="colorClass(msg.name)">{{ label(msg.name) }}</span>
               <span class="msg-time">{{ time(msg.timestamp) }}</span>
-              <button v-if="msg.name === 'user'" class="btn-retry" @click="retryMessage(msg.content)" title="重试">🔄</button>
+              <button v-if="msg.name === 'user'" class="btn-retry" @click="retryMessage(msg.content)" title="重试">↻</button>
             </div>
             <div class="msg-content">{{ formatMessageContent(msg) }}</div>
           </div>

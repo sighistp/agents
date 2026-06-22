@@ -10,13 +10,13 @@
     <!-- 下载选项 -->
     <div class="download-options">
       <button class="btn-download" @click="downloadSource" :disabled="downloading">
-        📦 下载源码
+        ⊞ 下载源码
       </button>
       <button class="btn-download" @click="downloadApp" :disabled="downloading">
-        🚀 下载应用
+        ▲ 下载应用
       </button>
       <button class="btn-download btn-download-primary" @click="downloadAll" :disabled="downloading">
-        📁 全部打包下载
+        ⊞ 全部打包下载
       </button>
     </div>
 
@@ -25,8 +25,8 @@
       <div class="preview-header">
         <span class="preview-filename">{{ previewFile }}</span>
         <div class="preview-actions">
-          <button class="btn-icon" @click="copyContent" title="复制">📋</button>
-          <button class="btn-icon" @click="closePreview" title="关闭">✕</button>
+          <button class="btn-icon" @click="copyContent" title="复制">☰</button>
+          <button class="btn-icon" @click="closePreview" title="关闭">×</button>
         </div>
       </div>
       <div v-if="previewContent" class="preview-code">

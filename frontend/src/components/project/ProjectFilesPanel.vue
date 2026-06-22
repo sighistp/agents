@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="card">
-    <div class="card-title">📁 生成文件</div>
+    <div class="card-title">⊞ 生成文件</div>
     <template>
       <template v-if="fileList.length > 0">
         <div class="files-list">
@@ -14,7 +14,7 @@
           <div class="preview-header">
             <span class="preview-filename">{{ previewFile }}</span>
             <div class="preview-actions">
-              <button class="btn-icon" @click="copyContent" title="复制">📋</button>
+              <button class="btn-icon" @click="copyContent" title="复制">☰</button>
               <button class="btn-icon" @click="closePreview" title="关闭">&times;</button>
             </div>
           </div>

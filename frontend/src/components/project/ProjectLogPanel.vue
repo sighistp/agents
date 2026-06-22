@@ -3,7 +3,7 @@
     <!-- Conversations -->
     <div class="card">
       <div class="card-title clickable" @click="toggleConversations">
-        💬 开发日志
+        ◇ 开发日志
         <span class="toggle-icon">{{ conversationsExpanded ? '▾' : '▸' }}</span>
       </div>
       <div v-if="conversationsExpanded">
@@ -23,7 +23,7 @@
             </div>
             <div class="conv-messages">
               <div v-for="(msg, j) in conv.messages" :key="j" class="conv-msg" :class="`conv-msg-${msg.role}`">
-                <span class="conv-role">{{ msg.role === 'assistant' ? '🤖' : '🔧' }}</span>
+                <span class="conv-role">{{ msg.role === 'assistant' ? '○' : '⚙' }}</span>
                 <div class="conv-content">{{ truncate(msg.content, 500) }}</div>
               </div>
             </div>
@@ -35,7 +35,7 @@
     <!-- Executions -->
     <div class="card">
       <div class="card-title clickable" @click="toggleExecutions">
-        📊 执行摘要
+        ▥ 执行摘要
         <span class="toggle-icon">{{ executionsExpanded ? '▾' : '▸' }}</span>
       </div>
       <div v-if="executionsExpanded">

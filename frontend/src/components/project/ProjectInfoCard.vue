@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="card">
-    <div class="card-title">📋 项目信息</div>
+    <div class="card-title">☰ 项目信息</div>
     <template v-if="state">
       <div class="info-grid">
         <div class="info-item">

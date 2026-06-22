@@ -5,9 +5,9 @@
       <button class="btn-back" @click="$router.push('/projects')">&larr; 返回</button>
       <h2 class="page-title">{{ displayName }}</h2>
       <div class="header-actions">
-        <button class="btn-action" @click="handleRerun" :disabled="!state">🔄 重新运行</button>
+        <button class="btn-action" @click="handleRerun" :disabled="!state">↻ 重新运行</button>
         <button class="btn-action" @click="showEditDialog" :disabled="!state">✏️ 编辑需求</button>
-        <button class="btn-action btn-export" @click="handleExport">📤 导出</button>
+        <button class="btn-action btn-export" @click="handleExport">↑ 导出</button>
       </div>
     </div>
 
