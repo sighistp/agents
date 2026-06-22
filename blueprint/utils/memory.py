@@ -1,4 +1,4 @@
-﻿"""Project memory layer using SQLite.
+"""Project memory layer using SQLite.
 
 Three tables:
 - project_snapshots: project metadata and current state
@@ -120,30 +120,27 @@ class ProjectMemory:
             raise ValueError(f"Invalid snapshot columns: {invalid}")
 
         conn = self._get_conn()
-        try:
-            # I8: Transaction for atomicity
-            with conn:
-                existing = conn.execute(
-                    "SELECT project_id FROM project_snapshots WHERE project_id = ?",
-                    (project_id,)
-                ).fetchone()
+        # Atomic transaction
+        with conn:
+            existing = conn.execute(
+                "SELECT project_id FROM project_snapshots WHERE project_id = ?",
+                (project_id,)
+            ).fetchone()
 
-                if existing:
-                    sets = ", ".join(f"{k} = ?" for k in kwargs)
-                    conn.execute(
-                        f"UPDATE project_snapshots SET {sets}, updated_at = CURRENT_TIMESTAMP WHERE project_id = ?",
-                        (*kwargs.values(), project_id)
-                    )
-                else:
-                    kwargs["project_id"] = project_id
-                    cols = ", ".join(kwargs.keys())
-                    placeholders = ", ".join(["?"] * len(kwargs))
-                    conn.execute(
-                        f"INSERT INTO project_snapshots ({cols}) VALUES ({placeholders})",
-                        tuple(kwargs.values())
-                    )
-        except Exception:
-            raise
+            if existing:
+                sets = ", ".join(f"{k} = ?" for k in kwargs)
+                conn.execute(
+                    f"UPDATE project_snapshots SET {sets}, updated_at = CURRENT_TIMESTAMP WHERE project_id = ?",
+                    (*kwargs.values(), project_id)
+                )
+            else:
+                kwargs["project_id"] = project_id
+                cols = ", ".join(kwargs.keys())
+                placeholders = ", ".join(["?"] * len(kwargs))
+                conn.execute(
+                    f"INSERT INTO project_snapshots ({cols}) VALUES ({placeholders})",
+                    tuple(kwargs.values())
+                )
 
     def get_snapshot(self, project_id: str) -> dict | None:
         """Get a project snapshot by ID."""

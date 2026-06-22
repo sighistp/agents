@@ -3,7 +3,10 @@ uvicorn
 langchain
 langchain-openai
 langgraph
+langgraph-checkpoint-sqlite
 pydantic
 pydantic-settings
-python-jose
+python-jose[cryptography]
 websockets
+httpx
+click

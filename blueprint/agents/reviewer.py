@@ -63,8 +63,6 @@ async def reviewer_agent(state: dict) -> dict[str, Any]:
     start_time = time.time()
     all_tool_calls: list = []
     logger.info(f"Reviewer started, files: {list(files.keys())}")
-    start_time = time.time()
-    all_tool_calls: list = []
 
     # Build initial prompt
     system_msg = {"role": "system", "content": REVIEWER_SYSTEM_PROMPT}

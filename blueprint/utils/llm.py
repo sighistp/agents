@@ -20,29 +20,21 @@ if sys.platform == "win32":
 
 from langchain_openai import ChatOpenAI
 
-# Add RAGv3 to path for resilience module
-_ragv3_path = os.path.join(os.path.dirname(__file__), "..", "..", "RAGv3", "rag")
-if os.path.exists(_ragv3_path):
-    sys.path.insert(0, os.path.abspath(os.path.join(_ragv3_path, "..")))
-
-try:
-    from rag.resilience import retry
-except ImportError:
-    # Fallback: simple retry decorator if RAGv3 not available
-    def retry(max_attempts=3, backoff_base=1.0):
-        def decorator(func):
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs):
-                for attempt in range(max_attempts):
-                    try:
-                        return func(*args, **kwargs)
-                    except Exception as e:
-                        if attempt == max_attempts - 1:
-                            raise
-                        import time
-                        time.sleep(backoff_base * (2 ** attempt))
-            return wrapper
-        return decorator
+# Retry decorator (local, no external dependency)
+def retry(max_attempts=3, backoff_base=1.0):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_attempts - 1:
+                        raise
+                    import time
+                    time.sleep(backoff_base * (2 ** attempt))
+        return wrapper
+    return decorator
 
 # Rate limiter: max 5 concurrent LLM calls
 _llm_semaphore = Semaphore(5)

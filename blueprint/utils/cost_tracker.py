@@ -38,7 +38,8 @@ class CostTracker:
             pass
 
     def get_cost(self, project_id: str) -> dict:
-        return self._costs.get(project_id, {})
+        with self._lock:
+            return self._costs.get(project_id, {})
 
 _tracker = CostTracker()
 
