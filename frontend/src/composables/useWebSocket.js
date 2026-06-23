@@ -62,7 +62,7 @@ function handleMessage(data) {
           }
         })
       }
-      if (data.data?.files) projectStore.files = data.data.files
+      if (data.data?.files && Object.keys(data.data.files).length > 0) projectStore.files = data.data.files
       if (data.data?.iteration !== undefined) projectStore.iteration = data.data.iteration
       break
     case 'agent_done':
@@ -84,7 +84,7 @@ function handleMessage(data) {
       break
     case 'project_done':
       projectStore.isRunning = false
-      if (data.data?.files) projectStore.files = data.data.files
+      if (data.data?.files && Object.keys(data.data.files).length > 0) projectStore.files = data.data.files
       projectStore.addMessage({ role: 'system', name: 'system', content: '项目完成！' })
       break
     case 'paused':
