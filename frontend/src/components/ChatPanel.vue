@@ -189,11 +189,13 @@ async function handleSave(name) {
 function clearChat() {
   setActiveProject(null)
   projectStore.messages = []
+  fullMessages.value = []
 }
 
 function newChat() {
   setActiveProject(null)
   projectStore.reset()
+  fullMessages.value = []
   send({ type: 'cancel' })
 }
 
