@@ -83,11 +83,10 @@ function handleMessage(data) {
       projectStore.addMessage({ role: 'system', name: 'system', content: `错误: ${data.message}` })
       break
     case 'project_done':
-      // 忽略不属于当前项目的完成消息（防止旧项目消息泄漏到新对话）
+      // 忽略不属于当前项目的完成消息
       if (data.project_id && data.project_id !== activeProjectId) break
       projectStore.isRunning = false
       if (data.data?.files && Object.keys(data.data.files).length > 0) projectStore.files = data.data.files
-      projectStore.addMessage({ role: 'system', name: 'system', content: '项目完成！' })
       break
     case 'paused':
       projectStore.isPaused = true
