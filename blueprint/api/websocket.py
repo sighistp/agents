@@ -288,17 +288,42 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
                         await _asyncio.sleep(0.5)
 
             # Check if graph paused (interrupt) or completed
-            final_status = current_state.get("status", "delivered")
-            if final_status == "running":
-                # Graph paused due to interrupt - send interrupt with architecture data
-                _put({"type": "interrupt", "project_id": project_id,
-                      "data": {
-                          "type": "confirm",
-                          "message": "请确认以下架构设计",
-                          "architecture": current_state.get("architecture", {}),
-                          "api_definitions": current_state.get("api_definitions", []),
-                          "data_models": current_state.get("data_models", []),
-                      }})
+            # Use get_state to detect pending interrupts reliably
+            has_interrupt = False
+            try:
+                graph_state = app.get_state(config)
+                if graph_state.next:  # Has pending nodes = interrupted
+                    has_interrupt = True
+                    # Extract interrupt value if available
+                    interrupt_val = {}
+                    if graph_state.tasks:
+                        for task in graph_state.tasks:
+                            if hasattr(task, 'interrupts') and task.interrupts:
+                                interrupt_val = task.interrupts[0].value if task.interrupts[0].value else {}
+                    _put({"type": "interrupt", "project_id": project_id,
+                          "data": {
+                              "type": interrupt_val.get("type", "confirm"),
+                              "message": interrupt_val.get("message", "请确认"),
+                              "architecture": interrupt_val.get("architecture", current_state.get("architecture", {})),
+                              "api_definitions": interrupt_val.get("api_definitions", current_state.get("api_definitions", [])),
+                              "data_models": interrupt_val.get("data_models", current_state.get("data_models", [])),
+                              "error": interrupt_val.get("error", ""),
+                              "files": interrupt_val.get("files", list(current_state.get("files", {}).keys())),
+                          }})
+            except Exception as e:
+                logger.warning(f"[{project_id}] Failed to check graph state: {e}")
+
+            if not has_interrupt:
+                final_status = current_state.get("status", "delivered")
+                if final_status == "running":
+                    _put({"type": "interrupt", "project_id": project_id,
+                          "data": {
+                              "type": "confirm",
+                              "message": "请确认以下架构设计",
+                              "architecture": current_state.get("architecture", {}),
+                              "api_definitions": current_state.get("api_definitions", []),
+                              "data_models": current_state.get("data_models", []),
+                          }})
             else:
                 # Graph completed normally
                 _put({"type": "project_done", "project_id": project_id,
