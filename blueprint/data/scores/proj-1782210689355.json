@@ -1,0 +1,1 @@
+{"total": 63.0, "dimensions": {"complexity": 100.0, "test_coverage": 0.0, "security": 100, "maintainability": 80.0, "documentation": 40.0}, "grade": "C", "suggestions": ["添加测试文件（test_*.py）以提高测试覆盖率", "添加 README.md 和代码注释"]}

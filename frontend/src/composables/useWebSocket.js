@@ -15,8 +15,9 @@ function handleMessage(data) {
   const projectStore = useProjectStore()
   const wsStore = useWsStore()
 
-  // 忽略不属于当前项目的消息（用户可能已开始新项目或清空聊天）
-  if (data.project_id && activeProjectId && data.project_id !== activeProjectId) {
+  // 忽略不属于当前项目的消息
+  // 当 activeProjectId 为 null 时（新建对话后），拒绝所有带 project_id 的旧消息
+  if (data.project_id && data.project_id !== activeProjectId) {
     return
   }
 
