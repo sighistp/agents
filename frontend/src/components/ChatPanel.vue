@@ -70,6 +70,7 @@ const saveError = ref('')
 // 精简/全量切换（持久化到 localStorage）
 const viewMode = ref(localStorage.getItem('chatViewMode') || 'brief')
 const fullMessages = ref([])
+const fullLoading = ref(false)
 
 const displayMessages = computed(() => {
   if (viewMode.value === 'full') return fullMessages.value
@@ -79,9 +80,10 @@ const displayMessages = computed(() => {
 async function switchView(mode) {
   viewMode.value = mode
   localStorage.setItem('chatViewMode', mode)
-  if (mode === 'full') {
+  if (mode === 'full' && !fullLoading.value) {
     const projectId = projectStore.currentProject?.id
     if (projectId) {
+      fullLoading.value = true
       try {
         const data = await api.getProjectConversations(projectId)
         // Flatten conversations into message list
@@ -98,6 +100,8 @@ async function switchView(mode) {
       } catch (e) {
         console.error('Failed to load conversations:', e)
         fullMessages.value = [{ role: 'system', name: 'system', content: '加载全量对话失败' }]
+      } finally {
+        fullLoading.value = false
       }
     }
   }
@@ -209,6 +213,10 @@ function retryMessage(content) {
 }
 
 onMounted(() => {
+  // 如果 localStorage 里是全量模式，自动加载
+  if (viewMode.value === 'full' && projectStore.currentProject?.id) {
+    switchView('full')
+  }
   // Check store first, then sessionStorage as fallback
   const req = projectStore.pendingRequirement || sessionStorage.getItem('pendingRequirement')
   if (req) {
