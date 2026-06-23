@@ -287,31 +287,23 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
                     while stop_event.is_set():
                         await _asyncio.sleep(0.5)
 
-            # If we reach here, the astream loop ended without __end__.
-            # This means the graph was interrupted (paused for user input).
-            # Check get_state to extract interrupt data.
-            try:
-                graph_state = app.get_state(config)
-                interrupt_val = {}
-                if graph_state.tasks:
-                    for task in graph_state.tasks:
-                        if hasattr(task, 'interrupts') and task.interrupts:
-                            interrupt_val = task.interrupts[0].value if task.interrupts[0].value else {}
+            # Check if graph paused (interrupt) or completed
+            # devteam v2.0 approach: check status field (set to "running" by human_confirm_node)
+            final_status = current_state.get("status", "delivered")
+            if final_status == "running":
+                # Graph paused due to interrupt - send interrupt with architecture data
                 _put({"type": "interrupt", "project_id": project_id,
                       "data": {
-                          "type": interrupt_val.get("type", "confirm"),
-                          "message": interrupt_val.get("message", "请确认"),
-                          "architecture": interrupt_val.get("architecture", current_state.get("architecture", {})),
-                          "api_definitions": interrupt_val.get("api_definitions", current_state.get("api_definitions", [])),
-                          "data_models": interrupt_val.get("data_models", current_state.get("data_models", [])),
-                          "error": interrupt_val.get("error", ""),
-                          "files": interrupt_val.get("files", list(current_state.get("files", {}).keys())),
+                          "type": "confirm",
+                          "message": "请确认以下架构设计",
+                          "architecture": current_state.get("architecture", {}),
+                          "api_definitions": current_state.get("api_definitions", []),
+                          "data_models": current_state.get("data_models", []),
                       }})
-            except Exception as e:
-                logger.warning(f"[{project_id}] Failed to get interrupt state: {e}")
-                # Fallback: send project_done if we can't determine interrupt state
+            else:
+                # Graph completed normally
                 _put({"type": "project_done", "project_id": project_id,
-                      "data": {"status": "delivered",
+                      "data": {"status": final_status,
                                "current_agent": "done",
                                "files": current_state.get("files", {})}})
         except _asyncio.CancelledError:
