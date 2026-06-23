@@ -15,9 +15,8 @@ function handleMessage(data) {
   const projectStore = useProjectStore()
   const wsStore = useWsStore()
 
-  // 忽略不属于当前项目的消息
-  // 当 activeProjectId 为 null 时（新建对话后），拒绝所有带 project_id 的旧消息
-  if (data.project_id && data.project_id !== activeProjectId) {
+  // 忽略不属于当前项目的消息（用户可能已开始新项目或清空聊天）
+  if (data.project_id && activeProjectId && data.project_id !== activeProjectId) {
     return
   }
 
@@ -84,6 +83,8 @@ function handleMessage(data) {
       projectStore.addMessage({ role: 'system', name: 'system', content: `错误: ${data.message}` })
       break
     case 'project_done':
+      // 忽略不属于当前项目的完成消息（防止旧项目消息泄漏到新对话）
+      if (data.project_id && data.project_id !== activeProjectId) break
       projectStore.isRunning = false
       if (data.data?.files && Object.keys(data.data.files).length > 0) projectStore.files = data.data.files
       projectStore.addMessage({ role: 'system', name: 'system', content: '项目完成！' })
