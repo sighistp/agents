@@ -194,6 +194,8 @@ function clearChat() {
   setActiveProject(null)
   projectStore.messages = []
   fullMessages.value = []
+  viewMode.value = 'brief'
+  localStorage.setItem('chatViewMode', 'brief')
 }
 
 function newChat() {

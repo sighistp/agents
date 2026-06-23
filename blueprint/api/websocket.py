@@ -313,21 +313,13 @@ def _run_graph_sync(app, input_data, config, msg_queue, loop, stop_event, epoch)
             except Exception as e:
                 logger.warning(f"[{project_id}] Failed to check graph state: {e}")
 
-            if not has_interrupt:
-                final_status = current_state.get("status", "delivered")
-                if final_status == "running":
-                    _put({"type": "interrupt", "project_id": project_id,
-                          "data": {
-                              "type": "confirm",
-                              "message": "请确认以下架构设计",
-                              "architecture": current_state.get("architecture", {}),
-                              "api_definitions": current_state.get("api_definitions", []),
-                              "data_models": current_state.get("data_models", []),
-                          }})
+            if has_interrupt:
+                # Graph paused — interrupt already sent above via get_state
+                pass
             else:
                 # Graph completed normally
                 _put({"type": "project_done", "project_id": project_id,
-                      "data": {"status": final_status,
+                      "data": {"status": current_state.get("status", "delivered"),
                                "current_agent": "done",
                                "files": current_state.get("files", {})}})
         except _asyncio.CancelledError:
